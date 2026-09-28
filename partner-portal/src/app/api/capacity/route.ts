@@ -1,5 +1,4 @@
 // src/app/api/capacity/route.ts
-import { createClient } from '@/lib/supabase/server';
 import { getPortalUser } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
@@ -14,12 +13,11 @@ export async function GET(req: NextRequest) {
     
     requireTier(user, 3);
 
-    const vendor = await prisma.vendor.findUnique({ where: { vendorId: user.vendorId } });
-    if (!vendor) return NextResponse.json({ error: 'Vendor not found' }, { status: 404 });
+    if (!user.supplierId) return NextResponse.json({ error: 'Supplier not found' }, { status: 404 });
 
     // Get latest snapshot per line
     const snapshots = await prisma.capacitySnapshot.findMany({
-      where: { vendorId: vendor.id },
+      where: { supplierId: user.supplierId },
       orderBy: { snapshotAt: 'desc' },
       distinct: ['lineId'],
       take: 20,
@@ -28,7 +26,7 @@ export async function GET(req: NextRequest) {
     // Get 7-day OEE history for the chart
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const history = await prisma.capacitySnapshot.findMany({
-      where: { vendorId: vendor.id, snapshotAt: { gte: sevenDaysAgo } },
+      where: { supplierId: user.supplierId, snapshotAt: { gte: sevenDaysAgo } },
       orderBy: { snapshotAt: 'asc' },
       select: { snapshotAt: true, oee: true, utilization: true, lineId: true },
     });

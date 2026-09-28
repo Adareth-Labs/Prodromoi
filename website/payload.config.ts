@@ -6,12 +6,14 @@ import { nodemailerAdapter } from '@payloadcms/email-nodemailer'
 import nodemailer from 'nodemailer'
 import { en } from '@payloadcms/translations/languages/en'
 
-import { Solutions }  from './src/collections/Solutions'
-import { Articles }   from './src/collections/Articles'
-import { News }       from './src/collections/News'
-import { Leadership } from './src/collections/Leadership'
-import { Facilities } from './src/collections/Facilities'
-import { Media }      from './src/collections/Media'
+import { Solutions }     from './src/collections/Solutions'
+import { Articles }      from './src/collections/Articles'
+import { News }          from './src/collections/News'
+import { Leadership }    from './src/collections/Leadership'
+import { Facilities }    from './src/collections/Facilities'
+import { Media }         from './src/collections/Media'
+import { BoardMembers }  from './src/collections/BoardMembers'
+import { SiteMetrics }   from './src/globals/SiteMetrics'
 
 export default buildConfig({
   // ── Admin panel ─────────────────────────────────────────────────────────────
@@ -30,6 +32,7 @@ export default buildConfig({
     News,
     Leadership,
     Facilities,
+    BoardMembers,
     Media,
     // Built-in users collection for admin access
     {
@@ -41,6 +44,11 @@ export default buildConfig({
         { name: 'department', type: 'text' },
       ],
     },
+  ],
+
+  // ── Globals ─────────────────────────────────────────────────────────────────
+  globals: [
+    SiteMetrics,
   ],
 
   // ── Editor ──────────────────────────────────────────────────────────────────

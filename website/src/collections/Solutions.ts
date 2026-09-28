@@ -39,6 +39,7 @@ export const Solutions: CollectionConfig = {
         { label: 'Thermal Management',       value: 'Thermal' },
         { label: 'Chassis & Safety',         value: 'Chassis' },
         { label: 'Connected Systems',        value: 'Connected' },
+        { label: 'Interiors',                value: 'Interiors' },
       ],
     },
     {
@@ -49,7 +50,68 @@ export const Solutions: CollectionConfig = {
         { label: 'Draft',     value: 'draft' },
         { label: 'Published', value: 'published' },
       ],
-      admin: { position: 'sidebar' },
+      admin: { position: 'sidebar', description: 'CMS publishing state — not the product lifecycle stage, see Lifecycle status below' },
+    },
+    {
+      name: 'lifecycleStatus',
+      type: 'select',
+      label: 'Lifecycle status',
+      admin: { position: 'sidebar', description: 'Product lifecycle stage (was Contentful "status")' },
+      options: [
+        { label: 'Active production',   value: 'active-production' },
+        { label: 'Beta validation',     value: 'beta-validation' },
+        { label: 'Engineering sample',  value: 'engineering-sample' },
+        { label: 'End of life',         value: 'end-of-life' },
+      ],
+    },
+    {
+      name: 'partFamily',
+      type: 'text',
+      admin: { description: 'e.g. "Battery Thermal Modules" — from Contentful partFamily' },
+    },
+    {
+      name: 'vehicleSegments',
+      type: 'select',
+      hasMany: true,
+      label: 'Vehicle segments',
+      options: [
+        { label: 'Passenger cars',            value: 'passenger-cars' },
+        { label: 'Commercial vehicles',       value: 'commercial-vehicles' },
+        { label: 'Off-highway',               value: 'off-highway' },
+        { label: 'Motorcycles & powersports', value: 'motorcycles-powersports' },
+      ],
+    },
+    {
+      name: 'certifications',
+      type: 'select',
+      hasMany: true,
+      options: [
+        { label: 'IATF 16949',          value: 'IATF 16949' },
+        { label: 'ISO 9001:2015',       value: 'ISO 9001:2015' },
+        { label: 'ISO 14001',           value: 'ISO 14001' },
+        { label: 'ISO 26262 ASIL D',    value: 'ISO 26262 ASIL D' },
+        { label: 'ISO 26262 ASIL B',    value: 'ISO 26262 ASIL B' },
+        { label: 'REACH',               value: 'REACH' },
+        { label: 'RoHS',                value: 'RoHS' },
+      ],
+    },
+    {
+      name: 'oemCompatibility',
+      type: 'text',
+      hasMany: true,
+      label: 'OEM compatibility',
+      admin: { description: 'e.g. "GM", "Ford"' },
+    },
+    {
+      name: 'technicalDataSheetUrl',
+      type: 'text',
+      label: 'Technical data sheet URL',
+    },
+    {
+      name: 'featuredOnHomepage',
+      type: 'checkbox',
+      label: 'Featured on homepage',
+      defaultValue: false,
     },
     // ── Content ───────────────────────────────────────────────────────────────
     {

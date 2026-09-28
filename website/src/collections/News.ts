@@ -44,7 +44,7 @@ export const News: CollectionConfig = {
     {
       name: 'type',
       type: 'select',
-      required: true,
+      admin: { description: 'What kind of item this is — separate from Topic category below, which is what it\'s about. Optional: Contentful never captured this, so migrated items may have none.' },
       options: [
         { label: 'Press release',  value: 'press-release' },
         { label: 'Award',          value: 'award' },
@@ -52,6 +52,35 @@ export const News: CollectionConfig = {
         { label: 'Product update', value: 'product-update' },
         { label: 'Event',          value: 'event' },
       ],
+    },
+    {
+      name: 'topicCategory',
+      type: 'select',
+      label: 'Topic category',
+      admin: { description: 'Subject area (Contentful "category") — also what the newsroom sidebar counts should group by' },
+      options: [
+        { label: 'Technical',     value: 'technical' },
+        { label: 'Corporate',     value: 'corporate' },
+        { label: 'ESG',           value: 'esg' },
+        { label: 'Financial',     value: 'financial' },
+        { label: 'Partnerships',  value: 'partnerships' },
+      ],
+    },
+    {
+      name: 'attribution',
+      type: 'text',
+      admin: { description: 'Source / byline attribution' },
+    },
+    {
+      name: 'readTimeMinutes',
+      type: 'number',
+      label: 'Read time (minutes)',
+    },
+    {
+      name: 'featuredMaterial',
+      type: 'checkbox',
+      label: 'Featured material',
+      defaultValue: false,
     },
     {
       name: 'excerpt',

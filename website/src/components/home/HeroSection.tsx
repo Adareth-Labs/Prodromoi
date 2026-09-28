@@ -24,8 +24,7 @@ interface Props {
 }
 
 export function HeroSection({
-  headline    = 'Engineering Precision
-for Global Mobility',
+  headline    = 'Engineering Precision for Global Mobility',
   subheadline = "Advanced component engineering and manufacturing for the world's most demanding OEMs. Structural integrity and technological innovation at scale across 42 global facilities.",
 }: Props) {
   return (

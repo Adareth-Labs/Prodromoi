@@ -34,49 +34,48 @@ function extractAuth(payload: Record<string, unknown>): AuthenticatedRequest['au
   }
 }
 
-export async function authenticate(
-  req: AuthenticatedRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> {
-  const authHeader = req.headers.authorization
-  if (!authHeader?.startsWith('Bearer ')) {
-    res.status(401).json({ success: false, error: 'Missing or invalid Authorization header' })
-    return
-  }
-
+// Shared by `authenticate` and `optionalAuth` below — both need to pull the
+// bearer token off the request and verify it against Supabase's JWKS; they
+// only differ in what happens when that fails (see `required`).
+async function verifyBearerToken(authHeader: string): Promise<AuthenticatedRequest['auth']> {
   const token = authHeader.slice(7)
+  const { payload } = await jwtVerify(token, JWKS, {
+    issuer:   ISSUER,
+    audience: 'authenticated',
+  })
+  return extractAuth(payload as Record<string, unknown>)
+}
 
-  try {
-    const { payload } = await jwtVerify(token, JWKS, {
-      issuer:   ISSUER,
-      audience: 'authenticated',
-    })
+function makeAuthMiddleware(required: boolean) {
+  return async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    const authHeader = req.headers.authorization
 
-    req.auth = extractAuth(payload as Record<string, unknown>)
-    next()
-  } catch (err) {
-    logger.warn('JWT validation failed', { error: String(err), ip: req.ip })
-    res.status(401).json({ success: false, error: 'Invalid or expired token' })
+    if (!authHeader?.startsWith('Bearer ')) {
+      if (required) {
+        res.status(401).json({ success: false, error: 'Missing or invalid Authorization header' })
+        return
+      }
+      next()
+      return
+    }
+
+    try {
+      req.auth = await verifyBearerToken(authHeader)
+      next()
+    } catch (err) {
+      if (required) {
+        logger.warn('JWT validation failed', { error: String(err), ip: req.ip })
+        res.status(401).json({ success: false, error: 'Invalid or expired token' })
+        return
+      }
+      // Optional auth: an invalid token just means the request proceeds
+      // unauthenticated, but the failure is still logged rather than
+      // silently discarded.
+      logger.debug('Optional auth: ignoring invalid token', { error: String(err), ip: req.ip })
+      next()
+    }
   }
 }
 
-// Optional auth — does not reject, populates req.auth if token is valid
-export async function optionalAuth(
-  req: AuthenticatedRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> {
-  const authHeader = req.headers.authorization
-  if (!authHeader?.startsWith('Bearer ')) { next(); return }
-
-  try {
-    const token = authHeader.slice(7)
-    const { payload } = await jwtVerify(token, JWKS, {
-      issuer:   ISSUER,
-      audience: 'authenticated',
-    })
-    req.auth = extractAuth(payload as Record<string, unknown>)
-  } catch { /* ignore */ }
-  next()
-}
+export const authenticate  = makeAuthMiddleware(true)
+export const optionalAuth  = makeAuthMiddleware(false)

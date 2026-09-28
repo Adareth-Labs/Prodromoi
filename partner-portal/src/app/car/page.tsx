@@ -1,24 +1,14 @@
-import { getPortalUser } from '@/lib/auth';
-import { redirect } from 'next/navigation';
-
+import { requirePortalUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { toPortalCAR } from '@/lib/mappers';
 import CARClient from './CARClient';
 import type { Metadata } from 'next';
 export const metadata: Metadata = { title: 'CAR Workflow' };
 
 export default async function CARPage() {
-  const user = await getPortalUser();
-  if (!user) redirect('/login');
-  if (user.tier < 3) redirect('/dashboard?error=insufficient_tier&required=3');
-  const vendor = await prisma.vendor.findUnique({ where: { vendorId: user.vendorId } });
-  const cars = vendor ? await prisma.cAR.findMany({
-    where: { vendorId: vendor.id }, orderBy: { openedAt: 'desc' },
-  }) : [];
-  const serialised = cars.map(c => ({
-    ...c,
-    openedAt: c.openedAt.toISOString(),
-    closedAt: c.closedAt?.toISOString() ?? null,
-    updatedAt: c.updatedAt.toISOString(),
-  }));
-  return <CARClient user={user} initialCARs={serialised} />;
+  const user = await requirePortalUser({ minTier: 3 });
+  const cars = user.supplierId ? await prisma.cARReport.findMany({
+    where: { supplierId: user.supplierId }, orderBy: { createdAt: 'desc' },
+  }).catch((err) => { console.error('[CARPage] cars query failed', err); return []; }) : [];
+  return <CARClient user={user} initialCARs={cars.map(toPortalCAR)} />;
 }

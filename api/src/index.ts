@@ -16,9 +16,14 @@ async function main() {
   async function shutdown(signal: string) {
     logger.info(`${signal} received — shutting down gracefully`)
     server.close(async () => {
-      await disconnectDatabase()
-      logger.info('Server closed')
-      process.exit(0)
+      try {
+        await disconnectDatabase()
+        logger.info('Server closed')
+        process.exit(0)
+      } catch (err) {
+        logger.error('Error during graceful shutdown', { error: String(err) })
+        process.exit(1)
+      }
     })
     setTimeout(() => { logger.error('Force exit after timeout'); process.exit(1) }, 10_000)
   }

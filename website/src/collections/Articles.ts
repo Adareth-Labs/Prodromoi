@@ -44,6 +44,7 @@ export const Articles: CollectionConfig = {
     {
       name: 'domain',
       type: 'select',
+      admin: { description: 'Product domain this article relates to — separate from Topic category below' },
       options: [
         { label: 'Electric Vehicle',   value: 'EV' },
         { label: 'ADAS & Autonomy',    value: 'ADAS' },
@@ -52,6 +53,55 @@ export const Articles: CollectionConfig = {
         { label: 'Chassis & Safety',   value: 'Chassis' },
         { label: 'Connected Systems',  value: 'Connected' },
       ],
+    },
+    {
+      name: 'topicCategory',
+      type: 'select',
+      label: 'Topic category',
+      admin: { description: 'Innovation topic (Contentful "category") — a different classification than Domain above' },
+      options: [
+        { label: 'Software-defined vehicle', value: 'software-defined-vehicle' },
+        { label: 'Electrification',          value: 'electrification' },
+        { label: 'Hydrogen fuel cell',       value: 'hydrogen-fuel-cell' },
+        { label: 'Cybersecurity',            value: 'cybersecurity' },
+        { label: 'E/E architecture',         value: 'ee-architecture' },
+        { label: 'Autonomous driving',       value: 'autonomous-driving' },
+        { label: 'Circular economy',         value: 'circular-economy' },
+      ],
+    },
+    {
+      name: 'authorName',
+      type: 'text',
+      label: 'Author name',
+    },
+    {
+      name: 'authorRole',
+      type: 'text',
+      label: 'Author role',
+    },
+    {
+      name: 'readTimeMinutes',
+      type: 'number',
+      label: 'Read time (minutes)',
+    },
+    {
+      name: 'isWhitePaper',
+      type: 'checkbox',
+      label: 'Is white paper',
+      defaultValue: false,
+    },
+    {
+      name: 'whitePaperAsset',
+      type: 'upload',
+      relationTo: 'media',
+      label: 'White paper asset',
+      admin: { condition: (data) => Boolean(data?.isWhitePaper) },
+    },
+    {
+      name: 'featuredOnHomepage',
+      type: 'checkbox',
+      label: 'Featured on homepage',
+      defaultValue: false,
     },
     {
       name: 'excerpt',

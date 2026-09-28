@@ -9,7 +9,9 @@
     "lint":             "next lint",
     "type-check":       "tsc --noEmit",
     "payload:generate": "payload generate:types && payload generate:importmap",
-    "payload:migrate":  "payload migrate"
+    "payload:migrate":  "payload migrate",
+    "migrate:contentful":          "tsx scripts/migrate-contentful-to-payload.ts",
+    "migrate:contentful:dry-run":  "tsx scripts/migrate-contentful-to-payload.ts --dry-run"
   },
   "dependencies": {
     "@aws-sdk/client-s3":            "^3.614.0",
@@ -21,6 +23,7 @@
     "@payloadcms/storage-s3":        "^3.0.0",
     "@payloadcms/translations":      "^3.0.0",
     "clsx":                          "^2.1.1",
+    "contentful":                    "^10.15.0",
     "date-fns":                      "^3.6.0",
     "next":                          "^16.2.7",
     "nodemailer":                    "^6.9.14",
@@ -39,6 +42,7 @@
     "eslint-config-next":  "^16.2.7",
     "postcss":             "^8.5.10",
     "tailwindcss":         "^3.4.6",
+    "tsx":                 "^4.19.0",
     "typescript":          "^5.5.3"
   }
 }

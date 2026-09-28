@@ -4,12 +4,23 @@ import { auditService } from '@/services/audit/AuditService'
 import { RFQ_TRANSITIONS, TRANSITION_TO_STATUS } from '@/types'
 import type { RFQTransitionEvent } from '@/types'
 import type { RFQStatus } from '@/types'
+import type { Prisma } from '@prisma/client'
 import { randomBytes } from 'crypto'
+import { notFound, HttpError } from '@/utils/httpError'
 
 function generateTrackingId(): string {
   const year  = new Date().getFullYear()
   const token = randomBytes(3).toString('hex').toUpperCase()
   return `RFQ-${year}-${token}`
+}
+
+export interface TransitionRFQInput {
+  rfqId:      string
+  event:      RFQTransitionEvent
+  actorId:    string
+  actorEmail: string
+  supplierId: string
+  reason?:    string
 }
 
 export interface CreateRFQInput {
@@ -58,18 +69,21 @@ class RFQService {
     return rfq
   }
 
-  async transition(
-    rfqId:      string,
-    event:      RFQTransitionEvent,
-    actorId:    string,
-    actorEmail: string,
-    reason?:    string
-  ) {
-    const rfq = await db.rFQ.findUniqueOrThrow({ where: { id: rfqId } })
+  async transition({ rfqId, event, actorId, actorEmail, supplierId, reason }: TransitionRFQInput) {
+    const rfq = await db.rFQ.findUnique({ where: { id: rfqId } })
+
+    // Return the same "not found" response whether the RFQ doesn't exist
+    // or belongs to a different supplier — never confirm cross-tenant
+    // existence to the caller.
+    if (!rfq || rfq.supplierId !== supplierId) {
+      throw notFound('RFQ')
+    }
+
     const allowed = RFQ_TRANSITIONS[rfq.status as RFQStatus]
 
     if (!allowed.includes(event)) {
-      throw new Error(
+      throw new HttpError(
+        409,
         `Cannot apply '${event}' to RFQ in status '${rfq.status}'. ` +
         `Allowed events: ${allowed.join(', ') || 'none'}.`
       )
@@ -77,9 +91,18 @@ class RFQService {
 
     const newStatus = TRANSITION_TO_STATUS[event]
 
-    const [updated] = await db.$transaction([
-      db.rFQ.update({
-        where: { id: rfqId },
+    // Interactive transaction: the conditional update and the transition-
+    // history write must succeed or fail together. A thrown error inside
+    // this callback rolls back everything in it — including the status
+    // change — so a crash between the two can't leave the RFQ's status
+    // changed with no corresponding history record.
+    const updated = await db.$transaction(async (tx: Prisma.TransactionClient) => {
+      // Conditional update: only writes if the status still matches what
+      // we just validated against. If a concurrent request already
+      // transitioned this RFQ, updateMany affects 0 rows and we abort
+      // instead of silently overwriting the other request's change.
+      const { count } = await tx.rFQ.updateMany({
+        where: { id: rfqId, status: rfq.status },
         data:  {
           status:       newStatus,
           reviewNotes:  reason,
@@ -87,8 +110,13 @@ class RFQService {
           reviewedAt:   ['APPROVE','REJECT','REQUEST_CLARIFICATION'].includes(event) ? new Date() : undefined,
           submittedAt:  event === 'SUBMIT' ? new Date() : undefined,
         },
-      }),
-      db.rFQTransition.create({
+      })
+
+      if (count === 0) {
+        throw new HttpError(409, 'RFQ status changed concurrently — please retry.')
+      }
+
+      await tx.rFQTransition.create({
         data: {
           rfqId,
           fromStatus: rfq.status,
@@ -97,8 +125,10 @@ class RFQService {
           actorEmail,
           reason,
         },
-      }),
-    ])
+      })
+
+      return tx.rFQ.findUniqueOrThrow({ where: { id: rfqId } })
+    })
 
     await auditService.log({
       action:       'TRANSITION',

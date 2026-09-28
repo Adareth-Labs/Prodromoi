@@ -1,37 +1,33 @@
 # Dependencies
 node_modules/
-.pnpm-store/
 
 # Environment / secrets
 .env
 .env.*
 !.env.example
-*.pem
-*.key
-*.crt
-*.p12
-*.pfx
-credentials.json
-service-account*.json
 
-# Next.js / build output
+# Next.js
 .next/
 out/
-build/
-dist/
-.turbo/
 
-# Generated / local data
-coverage/
-logs/
+# Build output
+dist/
+build/
+
+# Logs
 *.log
+logs/
+
+# Coverage
+coverage/
+
+# OS
 .DS_Store
 Thumbs.db
-
-# Prisma local artifacts
-prisma/*.db
-prisma/*.db-journal
 
 # IDE
 .vscode/
 .idea/
+
+# TypeScript
+*.tsbuildinfo

@@ -1,8 +1,7 @@
-import { getPortalUser } from '@/lib/auth';
-import { redirect } from 'next/navigation';
-import Link from 'next/link';
-
+import { requirePortalUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { toPortalRFQ } from '@/lib/mappers';
+import Link from 'next/link';
 import { Badge, KPICard, SectionHeader, RBACGate } from '@/components/ui';
 import { colors } from '@/styles/tokens';
 import type { Metadata } from 'next';
@@ -11,15 +10,13 @@ export const metadata: Metadata = { title: 'RFQ Submissions' };
 const C = colors;
 
 export default async function RFQListPage() {
-  const user = await getPortalUser();
-  if (!user) redirect('/login');
-
-  const vendor = await prisma.vendor.findUnique({ where: { vendorId: user.vendorId } });
-  const rfqs = vendor && user.tier >= 2 ? await prisma.rFQSubmission.findMany({
-    where: { vendorId: vendor.id },
-    orderBy: { submittedAt: 'desc' },
-    include: { documents: { select: { id: true, fileName: true } } },
-  }) : [];
+  const user = await requirePortalUser();
+  const rows = user.tier >= 2 && user.supplierId ? await prisma.rFQ.findMany({
+    where: { supplierId: user.supplierId },
+    include: { documents: true },
+    orderBy: { createdAt: 'desc' },
+  }).catch((err) => { console.error('[RFQListPage] rfq query failed', err); return []; }) : [];
+  const rfqs = rows.map(toPortalRFQ);
 
   const counts = {
     pending: rfqs.filter(r => r.status === 'PENDING').length,

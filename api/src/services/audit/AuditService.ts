@@ -48,7 +48,11 @@ class AuditService {
     }
   }
 
-  async getForResource(resourceType: string, resourceId: string, limit = 50) {
+  async getForResource({ resourceType, resourceId, limit = 50 }: {
+    resourceType: string
+    resourceId:   string
+    limit?:       number
+  }) {
     return db.auditLog.findMany({
       where:   { resourceType, resourceId },
       orderBy: { createdAt: 'desc' },
@@ -56,7 +60,7 @@ class AuditService {
     })
   }
 
-  async getForSupplier(supplierId: string, limit = 100) {
+  async getForSupplier({ supplierId, limit = 100 }: { supplierId: string; limit?: number }) {
     return db.auditLog.findMany({
       where:   { supplierId },
       orderBy: { createdAt: 'desc' },

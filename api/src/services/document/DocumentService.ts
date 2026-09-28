@@ -14,22 +14,53 @@ const s3 = new S3Client({
   credentials: { accessKeyId: env.AWS_ACCESS_KEY_ID, secretAccessKey: env.AWS_SECRET_ACCESS_KEY },
 })
 
+// Upload windows are short-lived on purpose — the client is expected to
+// start the PUT immediately after requesting the URL.
+const UPLOAD_URL_EXPIRY_SECONDS = 300 // 5 min
+
 // Key structure: {resourceType}/{supplierId}/{resourceId}/{fileName}
 // e.g. rfq/sup-123/rfq-456/drawing.pdf
 // e.g. ppap/sup-123/ppap-789/control_plan.pdf
 // e.g. certs/sup-123/iatf-cert.pdf
 
+interface BuildKeyInput {
+  resourceType: string
+  supplierId:   string
+  resourceId:   string
+  fileName:     string
+}
+
+interface GetUploadUrlInput {
+  key:         string
+  contentType: string
+  expiresIn?:  number
+}
+
+interface GetDownloadUrlInput {
+  key:        string
+  expiresIn?: number
+}
+
+interface AuditDownloadInput {
+  key:        string
+  actorId:    string
+  actorEmail: string
+  actorTier:  PortalTier
+  supplierId: string
+  ipAddress:  string
+}
+
 class DocumentService {
-  buildKey(resourceType: string, supplierId: string, resourceId: string, fileName: string): string {
+  buildKey({ resourceType, supplierId, resourceId, fileName }: BuildKeyInput): string {
     const sanitized = fileName.replace(/[^a-zA-Z0-9._-]/g, '_')
     return `${resourceType}/${supplierId}/${resourceId}/${randomUUID()}_${sanitized}`
   }
 
-  async getUploadUrl(
-    key:         string,
-    contentType: string,
-    expiresIn:   number = 300 // 5 min upload window
-  ): Promise<string> {
+  async getUploadUrl({
+    key,
+    contentType,
+    expiresIn = UPLOAD_URL_EXPIRY_SECONDS,
+  }: GetUploadUrlInput): Promise<string> {
     const command = new PutObjectCommand({
       Bucket:      env.S3_DOCUMENTS_BUCKET,
       Key:         key,
@@ -38,10 +69,10 @@ class DocumentService {
     return getSignedUrl(s3, command, { expiresIn })
   }
 
-  async getDownloadUrl(
-    key:       string,
-    expiresIn: number = env.S3_PRESIGN_EXPIRY
-  ): Promise<string> {
+  async getDownloadUrl({
+    key,
+    expiresIn = env.S3_PRESIGN_EXPIRY,
+  }: GetDownloadUrlInput): Promise<string> {
     const command = new GetObjectCommand({ Bucket: env.S3_DOCUMENTS_BUCKET, Key: key })
     return getSignedUrl(s3, command, { expiresIn })
   }
@@ -51,14 +82,7 @@ class DocumentService {
   }
 
   // Log every document download for IATF 16949 compliance
-  async auditDownload(params: {
-    key:        string
-    actorId:    string
-    actorEmail: string
-    actorTier:  PortalTier
-    supplierId: string
-    ipAddress:  string
-  }): Promise<void> {
+  async auditDownload(params: AuditDownloadInput): Promise<void> {
     await auditService.log({
       action:       'DOWNLOAD',
       actorId:      params.actorId,

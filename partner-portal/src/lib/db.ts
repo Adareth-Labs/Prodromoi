@@ -1,4 +1,5 @@
 // src/lib/db.ts
+import { randomBytes } from 'crypto';
 import { PrismaClient } from '@prisma/client';
 
 /**
@@ -27,10 +28,15 @@ export default prisma;
 // ─── Query helpers ────────────────────────────────────────────
 
 /**
- * Generate a human-readable reference ID.
- * e.g. "RFQ-2024-0891", "CAR-2024-089"
+ * Generate a human-readable reference ID, e.g. "RFQ-2024-9F3A21", "CAR-2024-9F3A".
+ *
+ * This used to be `prefix + year + (row count + 1)`, which races under
+ * concurrent requests (two inserts read the same count) and would collide
+ * with the API's random ids now that both apps write the same tables. It now
+ * matches the API's format: a random token instead of a sequence number.
  */
-export function generateRefId(prefix: string, sequence: number): string {
-  const year = new Date().getFullYear();
-  return `${prefix}-${year}-${String(sequence).padStart(4, '0')}`;
+export function generateRefId(prefix: string): string {
+  const year  = new Date().getFullYear();
+  const token = randomBytes(3).toString('hex').toUpperCase();
+  return `${prefix}-${year}-${token}`;
 }

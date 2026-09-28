@@ -79,6 +79,8 @@ model Supplier {
   ppaps       PPAPSubmission[]
   cars        CARReport[]
   scorecard   SupplierScorecard?
+  scorecardPeriods ScorecardPeriod[]
+  capacitySnapshots CapacitySnapshot[]
   auditLogs   AuditLog[]
 
   @@index([tier])
@@ -107,6 +109,16 @@ model RFQ {
   productSlug String?   // Reference to Contentful solution slug
   partFamily  String
   sku         String?
+
+  // Part detail (captured by the partner portal's RFQ form)
+  partNumber     String?
+  partName       String?
+  targetPrice    Decimal?  @db.Decimal(10, 2)
+  material       String?
+  toleranceClass String?
+  drawingRef     String?
+  requiredBy     DateTime?
+  notes          String?
   status      RFQStatus @default(DRAFT)
 
   // Volume requirements
@@ -201,6 +213,7 @@ model PPAPDocument {
   fileName     String
   sizeBytes    Int
   version      Int      @default(1)
+  ppapLevel    Int?     // PPAP submission level 1-5
   isRequired   Boolean  @default(true)
   uploadedBy   String
   uploadedAt   DateTime @default(now())
@@ -221,10 +234,13 @@ model CARReport {
 
   // Step 1: Identification
   deviationDescription String
-  partId               String?
+  partId               String?   // non-conforming part
   batchNumber          String?
+  affectedQty          Int?
+  detectedBy           String?
 
   // Step 2: Root cause
+  why1            String?   // first "why" of the 5-Why analysis
   rootCause       String?
   rootCauseMethod String? // 5-Why, Fishbone, etc.
 
@@ -239,6 +255,8 @@ model CARReport {
   verifiedAt  DateTime?
   closedBy    String?
   closedAt    DateTime?
+  closureNotes String?
+  currentStep Int       @default(1) // workflow step shown in the portal (1-3)
 
   assignedTo  String?   // Supabase user ID (quality inspector)
   createdBy   String
@@ -311,4 +329,64 @@ model AuditLog {
   @@index([resourceType, resourceId])
   @@index([supplierId])
   @@index([createdAt])
+}
+
+// Monthly scorecard rows shown in the partner portal. Distinct from
+// SupplierScorecard above, which is the single current-rating summary.
+model ScorecardPeriod {
+  id             String   @id @default(uuid())
+  supplierId     String
+  period         String   // "2024-09"
+  qualityPPM     Int
+  deliveryOTD    Decimal  @db.Decimal(5, 2)
+  responsiveness Int
+  documentation  Int
+  innovation     Int
+  sustainability Int
+  overallGrade   String
+  createdAt      DateTime @default(now())
+
+  supplier Supplier @relation(fields: [supplierId], references: [id])
+
+  @@unique([supplierId, period])
+}
+
+enum LineStatus {
+  ACTIVE
+  MAINTENANCE
+  CRITICAL
+  OFFLINE
+}
+
+model CapacitySnapshot {
+  id          String     @id @default(uuid())
+  supplierId  String
+  lineId      String
+  lineName    String
+  oee         Decimal    @db.Decimal(5, 2)
+  utilization Decimal    @db.Decimal(5, 2)
+  status      LineStatus
+  snapshotAt  DateTime   @default(now())
+
+  supplier Supplier @relation(fields: [supplierId], references: [id])
+
+  @@index([supplierId, snapshotAt])
+}
+
+// An inbound RFQ from an anonymous visitor on the public marketing site.
+// Deliberately NOT an RFQ: RFQ.supplierId is required because an RFQ is a
+// request from a real, authenticated supplier; a public lead has no supplier
+// account yet. Sales converts a lead into a Supplier + RFQ by hand and
+// records the link in `convertedToId`.
+model PublicRFQLead {
+  id            String    @id @default(uuid())
+  trackingId    String    @unique
+  productSlug   String?
+  sku           String?
+  annualVolume  Int?
+  sopDate       DateTime?
+  contactEmail  String?
+  step          Int
+  convertedToId String?   // RFQ.id, once converted
+  createdAt     DateTime  @default(now())
 }

@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from 'express'
 import { ZodError } from 'zod'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { logger } from '@/config/logger'
+import { HttpError } from '@/utils/httpError'
 
 export function errorHandler(
   err: unknown,
@@ -9,6 +10,11 @@ export function errorHandler(
   res: Response,
   _next: NextFunction
 ): void {
+  if (err instanceof HttpError) {
+    res.status(err.statusCode).json({ success: false, error: err.message })
+    return
+  }
+
   if (err instanceof ZodError) {
     res.status(400).json({
       success: false,

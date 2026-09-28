@@ -7,9 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
-    "db:generate": "prisma generate"
+    "db:generate": "prisma generate",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.616.0",
@@ -21,7 +21,8 @@
     "next": "^15.2.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "recharts": "^2.12.7"
+    "recharts": "^2.12.7",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
@@ -31,5 +32,8 @@
     "eslint-config-next": "^15.2.3",
     "prisma": "^5.16.0",
     "typescript": "^5.5.0"
+  },
+  "prisma": {
+    "schema": "../api/prisma/schema.prisma"
   }
 }

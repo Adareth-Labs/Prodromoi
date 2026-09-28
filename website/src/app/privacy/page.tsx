@@ -9,7 +9,7 @@ const SECTIONS = [
   { h:'5. Who we share it with', body:'We do not sell your data. Analytics data is processed by [ANALYTICS PROVIDER — name before launch]. Partner portal data is shared with OEM customers only where required for supplier qualification, and only under a data processing agreement.' },
   { h:'6. Your rights', body:'Under GDPR you have the right to access, correct, delete, and port your personal data. Withdraw analytics consent at any time using the Manage cookies link in the footer. To request deletion use the contact details provided with the live deployment. Requests are handled according to the privacy requirements applicable to the deployed service.' },
   { h:'7. Cookies we use', body:'pc_consent stores consent preferences (12 months). pc_lang stores language preference (session) — strictly necessary, no consent required. [ANALYTICS COOKIE NAME] is set only if you consent to analytics.' },
-  { h:'8. Contact', body:'For a production deployment, replace this demo contact section with the appointed data controller’s verified contact details. For UK users: Information Commissioner's Office at ico.org.uk. For EU users: your national data protection authority. Full list at edpb.europa.eu.' },
+  { h:'8. Contact', body:'For a production deployment, replace this demo contact section with the appointed data controller’s verified contact details. For UK users: Information Commissioner\'s Office at ico.org.uk. For EU users: your national data protection authority. Full list at edpb.europa.eu.' },
 ]
 export default function PrivacyPage() {
   return (

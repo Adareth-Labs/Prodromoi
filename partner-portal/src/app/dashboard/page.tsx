@@ -1,9 +1,7 @@
-// src/app/dashboard/page.tsx
-import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { getPortalUser } from '@/lib/auth';
-
+import { requirePortalUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { toPortalCAR, toPortalRFQ, toPortalScorecardPeriod } from '@/lib/mappers';
 import { Badge, KPICard, SectionHeader } from '@/components/ui';
 import { colors } from '@/styles/tokens';
 import type { Metadata } from 'next';
@@ -11,22 +9,28 @@ import type { Metadata } from 'next';
 export const metadata: Metadata = { title: 'Dashboard' };
 const C = colors;
 
+const RECENT_RFQS = 5;
+const RECENT_CARS = 3;
+
 export default async function DashboardPage() {
-  const user = await getPortalUser();
-  if (!user) redirect('/login');
+  const user = await requirePortalUser();
+  const where = { supplierId: user.supplierId };
 
-  const vendor = await prisma.vendor.findUnique({
-    where: { vendorId: user.vendorId },
-    include: {
-      rfqSubmissions: { orderBy: { submittedAt: 'desc' }, take: 5 },
-      cars:           { orderBy: { openedAt:   'desc' }, take: 3 },
-      scorecards:     { orderBy: { period:     'desc' }, take: 1 },
-    },
-  }).catch(() => null);
+  // Three independent reads — run them together instead of one after another.
+  const [rfqRows, carRows, scoreRows] = user.supplierId
+    ? await Promise.all([
+        prisma.rFQ.findMany({ where, include: { documents: true }, orderBy: { createdAt: 'desc' }, take: RECENT_RFQS }),
+        prisma.cARReport.findMany({ where, orderBy: { createdAt: 'desc' }, take: RECENT_CARS }),
+        prisma.scorecardPeriod.findMany({ where, orderBy: { period: 'desc' }, take: 1 }),
+      ]).catch((err) => {
+        console.error('[DashboardPage] dashboard queries failed', err);
+        return [[], [], []] as [[], [], []];
+      })
+    : [[], [], []];
 
-  const latestScore = vendor?.scorecards[0];
-  const rfqs        = vendor?.rfqSubmissions ?? [];
-  const cars        = vendor?.cars ?? [];
+  const latestScore = scoreRows[0] ? toPortalScorecardPeriod(scoreRows[0]) : undefined;
+  const rfqs        = rfqRows.map(toPortalRFQ);
+  const cars        = carRows.map(toPortalCAR);
 
   return (
     <div style={{ padding: 'clamp(14px,3vw,28px)', maxWidth: 1300, margin: '0 auto' }}>

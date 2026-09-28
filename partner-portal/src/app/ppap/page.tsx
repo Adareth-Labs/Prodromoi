@@ -1,21 +1,16 @@
-import { getPortalUser } from '@/lib/auth';
-import { redirect } from 'next/navigation';
-
+import { requirePortalUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { toPortalPPAPDocument } from '@/lib/mappers';
 import PPAPClient from './PPAPClient';
 import type { Metadata } from 'next';
 export const metadata: Metadata = { title: 'PPAP Hub' };
 
 export default async function PPAPPage() {
-  const user = await getPortalUser();
-  if (!user) redirect('/login');
-  if (user.tier < 2) redirect('/dashboard?error=insufficient_tier&required=2');
-  const vendor = await prisma.vendor.findUnique({ where: { vendorId: user.vendorId } });
-  const docs = vendor ? await prisma.pPAPDocument.findMany({
-    where: { vendorId: vendor.id }, orderBy: { uploadedAt: 'desc' },
-  }) : [];
-  const serialised = docs.map(d => ({
-    ...d, uploadedAt: d.uploadedAt.toISOString(), updatedAt: d.updatedAt.toISOString(),
-  }));
-  return <PPAPClient user={user} initialDocs={serialised} />;
+  const user = await requirePortalUser({ minTier: 2 });
+  const docs = user.supplierId ? await prisma.pPAPDocument.findMany({
+    where: { ppap: { supplierId: user.supplierId } },
+    include: { ppap: true },
+    orderBy: { uploadedAt: 'desc' },
+  }).catch((err) => { console.error('[PPAPPage] docs query failed', err); return []; }) : [];
+  return <PPAPClient user={user} initialDocs={docs.map(toPortalPPAPDocument)} />;
 }

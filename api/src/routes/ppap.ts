@@ -2,12 +2,13 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { authenticate } from '@/middleware/auth'
 import { requirePermission } from '@/middleware/rbac'
+import { asyncHandler } from '@/utils/asyncHandler'
 import { db } from '@/config/database'
 import { documentService } from '@/services/document/DocumentService'
 import { emailService } from '@/services/email/EmailService'
 import { auditService } from '@/services/audit/AuditService'
 import type { AuthenticatedRequest } from '@/types'
-import type { Request, Response } from 'express'
+import type { Response } from 'express'
 
 const router = Router()
 
@@ -25,24 +26,24 @@ const uploadSchema = z.object({
   isRequired:   z.boolean().default(true),
 })
 
-router.get('/', authenticate, requirePermission('ppap:read'), async (req: AuthenticatedRequest, res: Response) => {
+router.get('/', authenticate, requirePermission('ppap:read'), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const ppaps = await db.pPAPSubmission.findMany({
     where:   { supplierId: req.auth.supplierId },
     include: { documents: true },
     orderBy: { createdAt: 'desc' },
   })
   res.json({ success: true, data: ppaps })
-})
+}))
 
-router.post('/', authenticate, requirePermission('ppap:upload'), async (req: AuthenticatedRequest, res: Response) => {
+router.post('/', authenticate, requirePermission('ppap:upload'), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const body = createSchema.parse(req.body)
   const ppap = await db.pPAPSubmission.create({
     data: { supplierId: req.auth.supplierId, ...body, requiredBy: body.requiredBy ? new Date(body.requiredBy) : undefined },
   })
   res.status(201).json({ success: true, data: ppap })
-})
+}))
 
-router.get('/:id', authenticate, requirePermission('ppap:read'), async (req: AuthenticatedRequest, res: Response) => {
+router.get('/:id', authenticate, requirePermission('ppap:read'), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const ppap = await db.pPAPSubmission.findUnique({
     where:   { id: req.params.id },
     include: { documents: true },
@@ -51,30 +52,35 @@ router.get('/:id', authenticate, requirePermission('ppap:read'), async (req: Aut
     res.status(404).json({ success: false, error: 'PPAP submission not found' }); return
   }
   res.json({ success: true, data: ppap })
-})
+}))
 
-router.post('/:id/documents/upload-url', authenticate, requirePermission('ppap:upload'), async (req: AuthenticatedRequest, res: Response) => {
-  const body = uploadSchema.parse(req.body)
-  const key  = documentService.buildKey('ppap', req.auth.supplierId, req.params.id, body.fileName)
-  const uploadUrl = await documentService.getUploadUrl(key, body.contentType)
-
-  const [doc, ppap] = await Promise.all([
-    db.pPAPDocument.create({
-      data: { ppapId: req.params.id, documentType: body.documentType, s3Key: key, fileName: body.fileName, sizeBytes: body.sizeBytes, isRequired: body.isRequired, uploadedBy: req.auth.sub },
-    }),
-    db.pPAPSubmission.findUnique({ where: { id: req.params.id }, include: { supplier: true } }),
-  ])
-
-  if (ppap) {
-    await emailService.sendPPAPUploadNotification({
-      supplierId:    req.auth.supplierId,
-      supplierName:  ppap.supplier.companyName,
-      platformId:    ppap.platformId,
-      documentType:  body.documentType,
-      toEmail:       req.auth.email,
-      reviewerEmail: 'ppap-review@precisioncore.com',
-    })
+router.post('/:id/documents/upload-url', authenticate, requirePermission('ppap:upload'), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  // Ownership check first — never attach a document to a PPAP submission
+  // the caller doesn't own.
+  const ppap = await db.pPAPSubmission.findUnique({ where: { id: req.params.id }, include: { supplier: true } })
+  if (!ppap || ppap.supplierId !== req.auth.supplierId) {
+    res.status(404).json({ success: false, error: 'PPAP submission not found' })
+    return
   }
+
+  const body = uploadSchema.parse(req.body)
+  const key  = documentService.buildKey({
+    resourceType: 'ppap', supplierId: req.auth.supplierId, resourceId: req.params.id, fileName: body.fileName,
+  })
+  const uploadUrl = await documentService.getUploadUrl({ key, contentType: body.contentType })
+
+  const doc = await db.pPAPDocument.create({
+    data: { ppapId: req.params.id, documentType: body.documentType, s3Key: key, fileName: body.fileName, sizeBytes: body.sizeBytes, isRequired: body.isRequired, uploadedBy: req.auth.sub },
+  })
+
+  await emailService.sendPPAPUploadNotification({
+    supplierId:    req.auth.supplierId,
+    supplierName:  ppap.supplier.companyName,
+    platformId:    ppap.platformId,
+    documentType:  body.documentType,
+    toEmail:       req.auth.email,
+    reviewerEmail: 'ppap-review@precisioncore.com',
+  })
 
   await auditService.log({
     action: 'CREATE', actorId: req.auth.sub, actorEmail: req.auth.email,
@@ -83,6 +89,6 @@ router.post('/:id/documents/upload-url', authenticate, requirePermission('ppap:u
   })
 
   res.json({ success: true, data: { uploadUrl, key, documentId: doc.id } })
-})
+}))
 
 export default router

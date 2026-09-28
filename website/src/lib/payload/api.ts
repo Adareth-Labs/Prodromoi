@@ -18,12 +18,25 @@ async function getPayload() {
   return getPayloadHMR({ config })
 }
 
+// Every function below used to call `getPayload()` then `payload.find(...)`
+// directly with no error handling — a Payload/DB failure would surface as
+// an unhandled rejection instead of a logged, traceable failure. This is
+// the single place that pair of calls goes through now.
+async function queryCollection(args: Parameters<Awaited<ReturnType<typeof getPayload>>['find']>[0]) {
+  try {
+    const payload = await getPayload()
+    return await payload.find(args)
+  } catch (err) {
+    console.error(`[payload] find failed for collection="${args.collection}"`, err)
+    throw err
+  }
+}
+
 // ─── Solutions ───────────────────────────────────────────────────────────────
 
 export async function getSolutions(domain?: string): Promise<Solution[]> {
-  const payload = await getPayload()
   const where = domain ? { domain: { equals: domain } } : {}
-  const { docs } = await payload.find({
+  const { docs } = await queryCollection({
     collection: 'solutions',
     where:      { ...where, status: { equals: 'published' } },
     sort:       'title',
@@ -33,8 +46,7 @@ export async function getSolutions(domain?: string): Promise<Solution[]> {
 }
 
 export async function getSolutionBySlug(slug: string): Promise<Solution | null> {
-  const payload = await getPayload()
-  const { docs } = await payload.find({
+  const { docs } = await queryCollection({
     collection: 'solutions',
     where:      { slug: { equals: slug }, status: { equals: 'published' } },
     limit: 1,
@@ -45,10 +57,9 @@ export async function getSolutionBySlug(slug: string): Promise<Solution | null> 
 // ─── Innovation articles ─────────────────────────────────────────────────────
 
 export async function getArticles(opts?: { domain?: string; limit?: number }): Promise<Article[]> {
-  const payload = await getPayload()
   const where: Record<string, unknown> = { status: { equals: 'published' } }
   if (opts?.domain) where.domain = { equals: opts.domain }
-  const { docs } = await payload.find({
+  const { docs } = await queryCollection({
     collection: 'articles',
     where,
     sort:  '-publishedAt',
@@ -58,8 +69,7 @@ export async function getArticles(opts?: { domain?: string; limit?: number }): P
 }
 
 export async function getArticleBySlug(slug: string): Promise<Article | null> {
-  const payload = await getPayload()
-  const { docs } = await payload.find({
+  const { docs } = await queryCollection({
     collection: 'articles',
     where:      { slug: { equals: slug }, status: { equals: 'published' } },
     limit: 1,
@@ -70,10 +80,9 @@ export async function getArticleBySlug(slug: string): Promise<Article | null> {
 // ─── Newsroom ────────────────────────────────────────────────────────────────
 
 export async function getNewsItems(opts?: { type?: string; limit?: number }): Promise<NewsItem[]> {
-  const payload = await getPayload()
   const where: Record<string, unknown> = { status: { equals: 'published' } }
   if (opts?.type) where.type = { equals: opts.type }
-  const { docs } = await payload.find({
+  const { docs } = await queryCollection({
     collection: 'news',
     where,
     sort:  '-publishedAt',
@@ -83,8 +92,7 @@ export async function getNewsItems(opts?: { type?: string; limit?: number }): Pr
 }
 
 export async function getNewsItemBySlug(slug: string): Promise<NewsItem | null> {
-  const payload = await getPayload()
-  const { docs } = await payload.find({
+  const { docs } = await queryCollection({
     collection: 'news',
     where:      { slug: { equals: slug }, status: { equals: 'published' } },
     limit: 1,
@@ -95,8 +103,7 @@ export async function getNewsItemBySlug(slug: string): Promise<NewsItem | null> 
 // ─── Leadership ──────────────────────────────────────────────────────────────
 
 export async function getLeadership(): Promise<Leader[]> {
-  const payload = await getPayload()
-  const { docs } = await payload.find({
+  const { docs } = await queryCollection({
     collection: 'leadership',
     sort:        'order',
     limit:       50,
@@ -107,8 +114,7 @@ export async function getLeadership(): Promise<Leader[]> {
 // ─── Facilities ──────────────────────────────────────────────────────────────
 
 export async function getFacilities(): Promise<Facility[]> {
-  const payload = await getPayload()
-  const { docs } = await payload.find({
+  const { docs } = await queryCollection({
     collection: 'facilities',
     sort:        'name',
     limit:       50,
@@ -119,8 +125,7 @@ export async function getFacilities(): Promise<Facility[]> {
 // ─── Slug lists (for generateStaticParams) ───────────────────────────────────
 
 export async function getAllSolutionSlugs(): Promise<string[]> {
-  const payload = await getPayload()
-  const { docs } = await payload.find({
+  const { docs } = await queryCollection({
     collection: 'solutions',
     where:      { status: { equals: 'published' } },
     select:     { slug: true },
@@ -130,8 +135,7 @@ export async function getAllSolutionSlugs(): Promise<string[]> {
 }
 
 export async function getAllArticleSlugs(): Promise<string[]> {
-  const payload = await getPayload()
-  const { docs } = await payload.find({
+  const { docs } = await queryCollection({
     collection: 'articles',
     where:      { status: { equals: 'published' } },
     select:     { slug: true },
@@ -141,8 +145,7 @@ export async function getAllArticleSlugs(): Promise<string[]> {
 }
 
 export async function getAllNewsSlugs(): Promise<string[]> {
-  const payload = await getPayload()
-  const { docs } = await payload.find({
+  const { docs } = await queryCollection({
     collection: 'news',
     where:      { status: { equals: 'published' } },
     select:     { slug: true },

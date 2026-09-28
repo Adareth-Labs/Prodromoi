@@ -30,28 +30,51 @@ export default function LoginPage() {
   const signInPassword = async () => {
     if (!email || !password) { setError('Email and password are required.'); return; }
     setLoading('password'); clearError();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) { setError(error.message); setLoading(null); }
-    else { router.push('/dashboard'); router.refresh(); }
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) { setError(error.message); setLoading(null); }
+      else { router.push('/dashboard'); router.refresh(); }
+    } catch (err) {
+      console.error('[login] password sign-in failed', err);
+      setError('Something went wrong signing in. Please try again.');
+      setLoading(null);
+    }
   };
 
   const signInMagic = async () => {
     if (!email) { setError('Enter your email address.'); return; }
     setLoading('magic'); clearError();
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
-    });
-    if (error) { setError(error.message); setLoading(null); }
-    else { setMagicSent(true); setLoading(null); }
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+      });
+      if (error) { setError(error.message); setLoading(null); }
+      else { setMagicSent(true); setLoading(null); }
+    } catch (err) {
+      console.error('[login] magic-link sign-in failed', err);
+      setError('Something went wrong sending the magic link. Please try again.');
+      setLoading(null);
+    }
   };
 
   const signInOAuth = async (provider: 'google' | 'azure') => {
     setLoading(provider); clearError();
-    await supabase.auth.signInWithOAuth({
-      provider,
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
-    });
+    try {
+      // signInWithOAuth navigates the browser away on success, so `error`
+      // being set here means the redirect never happened — previously this
+      // wasn't checked at all, leaving the button stuck on its spinner
+      // forever with no feedback.
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: { redirectTo: `${window.location.origin}/auth/callback` },
+      });
+      if (error) { setError(error.message); setLoading(null); }
+    } catch (err) {
+      console.error('[login] OAuth sign-in failed', err);
+      setError('Something went wrong signing in. Please try again.');
+      setLoading(null);
+    }
   };
 
   const inputStyle: React.CSSProperties = {

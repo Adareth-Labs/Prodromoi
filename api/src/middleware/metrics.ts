@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express'
 import { register, httpRequestsTotal, httpRequestDurationMs } from '@/config/metrics'
+import { logger } from '@/config/logger'
 
 /**
  * Instrument every request with Prometheus counters + histogram.
@@ -31,6 +32,11 @@ export function metricsMiddleware(req: Request, res: Response, next: NextFunctio
  * reachable from the public internet — only from inside your VPC/network.
  */
 export async function metricsEndpoint(_req: Request, res: Response): Promise<void> {
-  res.set('Content-Type', register.contentType)
-  res.send(await register.metrics())
+  try {
+    res.set('Content-Type', register.contentType)
+    res.send(await register.metrics())
+  } catch (err) {
+    logger.error('Failed to serialize Prometheus metrics', { error: String(err) })
+    res.status(500).end()
+  }
 }

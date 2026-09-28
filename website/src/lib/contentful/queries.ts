@@ -12,6 +12,19 @@ import type {
   PaginatedResponse,
 } from '@/types'
 
+// Every query function below used to call `client.getEntries(...)` directly
+// with no error handling — a Contentful outage or bad query would surface
+// as an unhandled rejection instead of a logged, traceable failure. This is
+// the single place that call goes through now.
+async function fetchEntries(client: ReturnType<typeof getClient>, query: Record<string, unknown>) {
+  try {
+    return await client.getEntries(query)
+  } catch (err) {
+    console.error(`[contentful] getEntries failed for content_type="${query.content_type}"`, err)
+    throw err
+  }
+}
+
 // ── SOLUTIONS ──────────────────────────────────────────────────────────────────
 
 export async function getSolutions(options?: {
@@ -32,7 +45,7 @@ export async function getSolutions(options?: {
     query['fields.domain'] = options.domain
   }
 
-  const response = await client.getEntries(query)
+  const response = await fetchEntries(client, query)
 
   return {
     items: response.items.map(normaliseSolution),
@@ -47,7 +60,7 @@ export async function getSolutionBySlug(
   preview = false
 ): Promise<Solution | null> {
   const client = getClient(preview)
-  const response = await client.getEntries({
+  const response = await fetchEntries(client, {
     content_type: 'solution',
     'fields.slug': slug,
     limit: 1,
@@ -59,7 +72,7 @@ export async function getSolutionBySlug(
 
 export async function getAllSolutionSlugs(): Promise<string[]> {
   const client = getClient()
-  const response = await client.getEntries({
+  const response = await fetchEntries(client, {
     content_type: 'solution',
     select: ['fields.slug'],
     limit: 1000,
@@ -77,7 +90,7 @@ export async function getInnovationArticles(options?: {
   preview?: boolean
 }): Promise<PaginatedResponse<InnovationArticle>> {
   const client = getClient(options?.preview)
-  const response = await client.getEntries({
+  const response = await fetchEntries(client, {
     content_type: 'innovationArticle',
     order: ['-fields.publishedAt'],
     limit: options?.limit ?? 20,
@@ -97,7 +110,7 @@ export async function getInnovationArticleBySlug(
   preview = false
 ): Promise<InnovationArticle | null> {
   const client = getClient(preview)
-  const response = await client.getEntries({
+  const response = await fetchEntries(client, {
     content_type: 'innovationArticle',
     'fields.slug': slug,
     limit: 1,
@@ -109,7 +122,7 @@ export async function getInnovationArticleBySlug(
 
 export async function getAllInnovationSlugs(): Promise<string[]> {
   const client = getClient()
-  const response = await client.getEntries({
+  const response = await fetchEntries(client, {
     content_type: 'innovationArticle',
     select: ['fields.slug'],
     limit: 1000,
@@ -139,7 +152,7 @@ export async function getNewsArticles(options?: {
     query['fields.category'] = options.category
   }
 
-  const response = await client.getEntries(query)
+  const response = await fetchEntries(client, query)
 
   return {
     items: response.items.map(normaliseNewsArticle),
@@ -154,7 +167,7 @@ export async function getNewsArticleBySlug(
   preview = false
 ): Promise<NewsArticle | null> {
   const client = getClient(preview)
-  const response = await client.getEntries({
+  const response = await fetchEntries(client, {
     content_type: 'newsArticle',
     'fields.slug': slug,
     limit: 1,
@@ -166,7 +179,7 @@ export async function getNewsArticleBySlug(
 
 export async function getAllNewsSlugs(): Promise<string[]> {
   const client = getClient()
-  const response = await client.getEntries({
+  const response = await fetchEntries(client, {
     content_type: 'newsArticle',
     select: ['fields.slug'],
     limit: 1000,
@@ -180,7 +193,7 @@ export async function getAllNewsSlugs(): Promise<string[]> {
 
 export async function getLeadership(preview = false): Promise<LeadershipProfile[]> {
   const client = getClient(preview)
-  const response = await client.getEntries({
+  const response = await fetchEntries(client, {
     content_type: 'leadershipProfile',
     order: ['fields.sortOrder'],
     limit: 50,
@@ -190,7 +203,7 @@ export async function getLeadership(preview = false): Promise<LeadershipProfile[
 
 export async function getFacilities(preview = false): Promise<Facility[]> {
   const client = getClient(preview)
-  const response = await client.getEntries({
+  const response = await fetchEntries(client, {
     content_type: 'facility',
     order: ['fields.country', 'fields.city'],
     limit: 200,
@@ -200,7 +213,7 @@ export async function getFacilities(preview = false): Promise<Facility[]> {
 
 export async function getBoardMembers(preview = false): Promise<BoardMember[]> {
   const client = getClient(preview)
-  const response = await client.getEntries({
+  const response = await fetchEntries(client, {
     content_type: 'boardMember',
     order: ['fields.sortOrder'],
     limit: 50,
@@ -212,7 +225,7 @@ export async function getBoardMembers(preview = false): Promise<BoardMember[]> {
 
 export async function getSiteMetrics(preview = false): Promise<SiteMetrics | null> {
   const client = getClient(preview)
-  const response = await client.getEntries({
+  const response = await fetchEntries(client, {
     content_type: 'siteMetrics',
     limit: 1,
   })

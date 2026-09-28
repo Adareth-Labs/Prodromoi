@@ -23,12 +23,16 @@ export async function GET(request: Request) {
 
   // 3. Exchange the PKCE code for a secure session
   if (code) {
-    const supabase = await createClient();
-    const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+    try {
+      const supabase = await createClient();
+      const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
 
-    if (!exchangeError) {
-      // Successful sign-in — safely redirect to intended local destination
-      return NextResponse.redirect(`${origin}${next}`);
+      if (!exchangeError) {
+        // Successful sign-in — safely redirect to intended local destination
+        return NextResponse.redirect(`${origin}${next}`);
+      }
+    } catch (err) {
+      console.error('[auth/callback] session exchange failed', err);
     }
   }
 

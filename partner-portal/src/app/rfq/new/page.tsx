@@ -38,6 +38,7 @@ export default function RFQNewPage() {
   const [uploading, setUploading]   = useState<string | null>(null);
   const [s3Log, setS3Log]           = useState('');
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [formError, setFormError] = useState('');
 
   const [form, setForm] = useState<FormState>({
     partNumber: '', partName: '', annualVolume: '', targetPrice: '',
@@ -49,12 +50,22 @@ export default function RFQNewPage() {
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data: { user: sbUser } }) => {
       if (!sbUser) { router.push('/login'); return; }
-      // Fetch vendor record from our API so we have tier/company/vendorId
-      const res = await fetch('/api/me');
-      if (res.ok) {
-        const { data } = await res.json();
-        setUser(data);
+      try {
+        // Fetch vendor record from our API so we have tier/company/vendorId
+        const res = await fetch('/api/me');
+        if (res.ok) {
+          const { data } = await res.json();
+          setUser(data);
+        } else {
+          setFormError('Could not load your profile. Please refresh the page.');
+        }
+      } catch (err) {
+        console.error('[RFQNewPage] failed to load profile', err);
+        setFormError('Could not load your profile. Please refresh the page.');
       }
+    }).catch((err) => {
+      console.error('[RFQNewPage] Supabase auth check failed', err);
+      router.push('/login');
     });
   }, []);
 
@@ -63,21 +74,25 @@ export default function RFQNewPage() {
       setForm(p => ({ ...p, [k]: e.target.value }));
 
   const handleUpload = async (docType: string) => {
-    setUploading(docType); setS3Log('');
+    setUploading(docType); setS3Log(''); setFormError('');
     try {
       const res = await fetch('/api/rfq/upload-url', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fileName: `${docType.replace(/\W+/g,'-').toLowerCase()}.pdf`, contentType: 'application/pdf', sizeBytes: 4_200_000 }),
       });
+      if (!res.ok) throw new Error(`Upload URL request failed with status ${res.status}`);
       const { uploadUrl, s3Key } = await res.json();
       setS3Log(`PUT ${uploadUrl?.split('?')[0] ?? '...'}\nx-amz-server-side-encryption: AES256\n\n< HTTP/1.1 200 OK → Object stored [OK]`);
       setUploadedFiles(p => [...p, { name: `${docType.toLowerCase().replace(/\W+/g,'-')}-${Date.now()}.pdf`, type: docType, size: `${(Math.random()*7+0.5).toFixed(1)} MB`, s3Key }]);
+    } catch (err) {
+      console.error('[RFQNewPage] upload failed', err);
+      setFormError(`Failed to upload ${docType}. Please try again.`);
     } finally { setUploading(null); }
   };
 
   const handleSubmit = async () => {
-    setSubmitting(true);
+    setSubmitting(true); setFormError('');
     try {
       const body: CreateRFQInput = {
         partNumber:    form.partNumber    || 'PT-7A-CRANK-001',
@@ -94,9 +109,13 @@ export default function RFQNewPage() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
+      if (!res.ok) throw new Error(`RFQ submission failed with status ${res.status}`);
       const json = await res.json();
       setRefId(json.data?.referenceId ?? 'RFQ-2024-0001');
       setDone(true);
+    } catch (err) {
+      console.error('[RFQNewPage] submission failed', err);
+      setFormError('Failed to submit RFQ. Please try again.');
     } finally { setSubmitting(false); }
   };
 
@@ -139,6 +158,12 @@ export default function RFQNewPage() {
     <div style={{ padding: pad, maxWidth: 1020, margin: '0 auto' }}>
       <RBACGate user={user} minTier={2}>
         <SectionHeader eyebrow="RFQ Flow / New Submission" title={`Step ${step}: ${STEPS[step-1]}`} mob={mob} />
+
+        {formError && (
+          <div style={{ background: '#fef2f2', border: '1px solid #b91c1c', color: '#b91c1c', padding: '10px 14px', fontSize: 13, marginBottom: 16 }}>
+            {formError}
+          </div>
+        )}
 
         {/* Stepper */}
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: mob ? 22 : 32 }}>

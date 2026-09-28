@@ -11,6 +11,12 @@ export const Facilities: CollectionConfig = {
   access: { read: () => true },
   fields: [
     {
+      name: 'contentfulId',
+      type: 'text',
+      unique: true,
+      admin: { hidden: true, description: 'Contentful entry sys.id — for migration dedupe only' },
+    },
+    {
       name: 'name',
       type: 'text',
       required: true,
@@ -26,6 +32,23 @@ export const Facilities: CollectionConfig = {
       name: 'country',
       type: 'text',
       required: true,
+    },
+    {
+      name: 'countryCode',
+      type: 'text',
+      label: 'Country code (ISO 3166-1 alpha-2)',
+      maxLength: 2,
+    },
+    {
+      name: 'facilityType',
+      type: 'select',
+      label: 'Facility type',
+      admin: { description: 'What kind of site this is — distinct from Status below, which is its build phase' },
+      options: [
+        { label: 'Manufacturing',      value: 'manufacturing' },
+        { label: 'R&D centre',         value: 'rd-centre' },
+        { label: 'Sales office',       value: 'sales-office' },
+      ],
     },
     {
       name: 'status',
@@ -49,6 +72,19 @@ export const Facilities: CollectionConfig = {
       label: 'Headcount',
     },
     {
+      name: 'employeeRange',
+      type: 'text',
+      label: 'Employee range',
+      admin: { description: 'Bucketed range as reported historically, e.g. "500-1000" — kept separate from the exact Headcount figure above' },
+    },
+    {
+      name: 'iatfCertified',
+      type: 'checkbox',
+      label: 'IATF 16949 certified',
+      defaultValue: false,
+      admin: { description: 'Plain yes/no flag — not inferred from the Certifications list below' },
+    },
+    {
       name: 'certifications',
       type: 'array',
       label: 'Certifications',
@@ -56,6 +92,13 @@ export const Facilities: CollectionConfig = {
         { name: 'name', type: 'text', required: true, label: 'Certification (e.g. IATF 16949)' },
         { name: 'year', type: 'number', label: 'Year certified' },
       ],
+    },
+    {
+      name: 'capabilities',
+      type: 'text',
+      hasMany: true,
+      label: 'Capabilities (legacy free text)',
+      admin: { description: 'Raw capability tags as originally recorded — see Specialties below for the structured equivalent' },
     },
     {
       name: 'specialties',

@@ -1,51 +1,38 @@
 // src/app/api/scorecard/route.ts
-import { createClient } from '@/lib/supabase/server';
 import { getPortalUser } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireTier } from '@/lib/rbac';
+import { toPortalScorecardPeriod } from '@/lib/mappers';
 
-// GET /api/scorecard — fetch scorecard data for the authenticated vendor
-export async function GET(req: NextRequest) {
+const SCORECARD_MONTHS = 12;
+
+// GET /api/scorecard — fetch scorecard data for the authenticated supplier
+export async function GET(_req: NextRequest) {
   try {
     const user = await getPortalUser();
     if (!user) return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
 
-    
     requireTier(user, 2);
+    if (!user.supplierId) return NextResponse.json({ error: 'Supplier not found' }, { status: 404 });
 
-    const vendor = await prisma.vendor.findUnique({
-      where: { vendorId: user.vendorId },
-      include: {
-        scorecards: {
-          orderBy: { period: 'desc' },
-          take: 12, // Last 12 months
-        },
-      },
+    const rows = await prisma.scorecardPeriod.findMany({
+      where: { supplierId: user.supplierId },
+      orderBy: { period: 'desc' },
+      take: SCORECARD_MONTHS,
     });
+    const periods = rows.map(toPortalScorecardPeriod);
 
-    if (!vendor) return NextResponse.json({ error: 'Vendor not found' }, { status: 404 });
-
-    // Compute overall grade from most recent period
-    const latest = vendor.scorecards[0];
-    const overallGrade = latest?.overallGrade ?? 'N/A';
+    // Overall grade comes from the most recent period
+    const overallGrade = periods[0]?.overallGrade ?? 'N/A';
 
     return NextResponse.json({
       data: {
-        vendorId: vendor.vendorId,
-        company: vendor.company,
-        tier: vendor.tier,
+        vendorId: user.vendorId,
+        company: user.company,
+        tier: user.tier,
         overallGrade,
-        periods: vendor.scorecards.map(s => ({
-          period: s.period,
-          qualityPPM: s.qualityPPM,
-          deliveryOTD: Number(s.deliveryOTD),
-          responsiveness: s.responsiveness,
-          documentation: s.documentation,
-          innovation: s.innovation,
-          sustainability: s.sustainability,
-          overallGrade: s.overallGrade,
-        })),
+        periods,
       },
     });
   } catch (err) {

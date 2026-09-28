@@ -23,7 +23,7 @@ export default function CARDetailClient({ user, car: initialCar }: { user: Porta
       await fetch(`/api/car/${car.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ why1: form.why1, rootCause: form.rc, correctiveActions: form.d6, preventiveActions: form.d7, currentStep: step, status: step === 3 ? 'PENDING_REVIEW' : 'IN_PROGRESS' }) });
       if (step === 3) router.push('/car');
-      else setStep(s => s + 1);
+      else setStep((s: number) => s + 1);
     } finally { setSaving(false); }
   };
   const pad = mob ? 14 : 26;
@@ -66,7 +66,7 @@ export default function CARDetailClient({ user, car: initialCar }: { user: Porta
         </div>}
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-        <SecondaryButton onClick={() => setStep(s => Math.max(1, s-1))} disabled={step===1} icon="arrow_back">Prev</SecondaryButton>
+        <SecondaryButton onClick={() => setStep((s: number) => Math.max(1, s-1))} disabled={step===1} icon="arrow_back">Prev</SecondaryButton>
         <PrimaryButton onClick={save} disabled={saving} icon={saving?undefined:'arrow_forward'}>
           {saving ? <><Spinner size={13} /> Saving...</> : step < 3 ? `Continue: ${STEPS[step]}` : 'Submit CAR'}
         </PrimaryButton>

@@ -9,7 +9,8 @@ export interface PortalUser {
   email: string;
   name: string;
   picture?: string;
-  vendorId: string;
+  vendorId: string;   // public supplier code, e.g. "BW-49201"
+  supplierId: string; // Supplier.id (database key); empty if the user has no supplier yet
   company: string;
   tier: Tier;
   role: string;

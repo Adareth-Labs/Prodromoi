@@ -25,11 +25,21 @@ db.$on('warn' as never, (e: { message: string }) => {
 })
 
 export async function connectDatabase(): Promise<void> {
-  await db.$connect()
-  logger.info('Database connected')
+  try {
+    await db.$connect()
+    logger.info('Database connected')
+  } catch (err) {
+    logger.error('Database connection failed', { error: String(err) })
+    throw err
+  }
 }
 
 export async function disconnectDatabase(): Promise<void> {
-  await db.$disconnect()
-  logger.info('Database disconnected')
+  try {
+    await db.$disconnect()
+    logger.info('Database disconnected')
+  } catch (err) {
+    logger.error('Database disconnect failed', { error: String(err) })
+    throw err
+  }
 }
