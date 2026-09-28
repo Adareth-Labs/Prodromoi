@@ -35,4 +35,14 @@ router.get('/me/audit-log', authenticate, requireTier('QUALIFIED'), asyncHandler
   res.json({ success: true, data: logs })
 }))
 
+// GET /suppliers/me/scorecard/periods — monthly scorecard history
+router.get('/me/scorecard/periods', authenticate, requireTier('QUALIFIED'), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const periods = await db.scorecardPeriod.findMany({
+    where: { supplierId: req.auth.supplierId },
+    orderBy: { period: 'desc' },
+    take: 12,
+  })
+  res.json({ success: true, data: periods })
+}))
+
 export default router

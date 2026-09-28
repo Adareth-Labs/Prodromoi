@@ -56,7 +56,7 @@ export const Solutions: CollectionConfig = {
       name: 'lifecycleStatus',
       type: 'select',
       label: 'Lifecycle status',
-      admin: { position: 'sidebar', description: 'Product lifecycle stage (was Contentful "status")' },
+      admin: { position: 'sidebar', description: 'Product lifecycle stage (was legacy lifecycle status)' },
       options: [
         { label: 'Active production',   value: 'active-production' },
         { label: 'Beta validation',     value: 'beta-validation' },
@@ -67,7 +67,7 @@ export const Solutions: CollectionConfig = {
     {
       name: 'partFamily',
       type: 'text',
-      admin: { description: 'e.g. "Battery Thermal Modules" — from Contentful partFamily' },
+      admin: { description: 'e.g. "Battery Thermal Modules" — from legacy CMS data partFamily' },
     },
     {
       name: 'vehicleSegments',

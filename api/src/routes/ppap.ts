@@ -26,6 +26,50 @@ const uploadSchema = z.object({
   isRequired:   z.boolean().default(true),
 })
 
+
+// GET /ppap/documents — flattened document list for the portal UI
+router.get('/documents', authenticate, requirePermission('ppap:read'), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const documents = await db.pPAPDocument.findMany({
+    where: { ppap: { supplierId: req.auth.supplierId } },
+    include: { ppap: true },
+    orderBy: { uploadedAt: 'desc' },
+  })
+  res.json({ success: true, data: documents })
+}))
+
+// POST /ppap/upload-url — portal-friendly upload endpoint that creates the
+// PPAP submission on demand when the supplier doesn't already have one.
+router.post('/upload-url', authenticate, requirePermission('ppap:upload'), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const body = uploadSchema.extend({
+    ppapId: z.string().uuid().optional(),
+    ppapLevel: z.number().int().min(1).max(5).default(3),
+    platformId: z.string().min(1).default('Partner Portal'),
+  }).parse(req.body)
+
+  let ppap = body.ppapId
+    ? await db.pPAPSubmission.findFirst({ where: { id: body.ppapId, supplierId: req.auth.supplierId } })
+    : await db.pPAPSubmission.findFirst({ where: { supplierId: req.auth.supplierId }, orderBy: { createdAt: 'desc' } })
+
+  if (!ppap) {
+    ppap = await db.pPAPSubmission.create({ data: { supplierId: req.auth.supplierId, platformId: body.platformId } })
+  }
+
+  const key = documentService.buildKey({
+    resourceType: 'ppap', supplierId: req.auth.supplierId, resourceId: ppap.id, fileName: body.fileName,
+  })
+  const uploadUrl = await documentService.getUploadUrl({ key, contentType: body.contentType })
+  const doc = await db.pPAPDocument.create({
+    data: { ppapId: ppap.id, documentType: body.documentType, s3Key: key, fileName: body.fileName, sizeBytes: body.sizeBytes, ppapLevel: body.ppapLevel, isRequired: body.isRequired, uploadedBy: req.auth.sub },
+  })
+
+  await auditService.log({
+    action: 'CREATE', actorId: req.auth.sub, actorEmail: req.auth.email, actorTier: req.auth.tier,
+    resourceType: 'PPAPDocument', resourceId: doc.id, supplierId: req.auth.supplierId, ppapId: ppap.id,
+  })
+
+  res.json({ success: true, data: { uploadUrl, key, documentId: doc.id, ppapId: ppap.id } })
+}))
+
 router.get('/', authenticate, requirePermission('ppap:read'), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const ppaps = await db.pPAPSubmission.findMany({
     where:   { supplierId: req.auth.supplierId },

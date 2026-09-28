@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { requirePortalUser } from '@/lib/auth';
-import { prisma } from '@/lib/db';
+import { apiFetchServer } from '@/lib/api-server';
 import { toPortalCAR, toPortalRFQ, toPortalScorecardPeriod } from '@/lib/mappers';
 import { Badge, KPICard, SectionHeader } from '@/components/ui';
 import { colors } from '@/styles/tokens';
@@ -14,23 +14,15 @@ const RECENT_CARS = 3;
 
 export default async function DashboardPage() {
   const user = await requirePortalUser();
-  const where = { supplierId: user.supplierId };
+  const [rfqResponse, carResponse, scoreResponse] = await Promise.all([
+    apiFetchServer<any>('/v1/rfq').catch((err) => { console.error('[DashboardPage] RFQ API failed', err); return { data: [] }; }),
+    apiFetchServer<any>('/v1/quality').catch((err) => { console.error('[DashboardPage] CAR API failed', err); return { data: [] }; }),
+    apiFetchServer<any>('/v1/suppliers/me/scorecard/periods').catch((err) => { console.error('[DashboardPage] scorecard API failed', err); return { data: [] }; }),
+  ]);
 
-  // Three independent reads — run them together instead of one after another.
-  const [rfqRows, carRows, scoreRows] = user.supplierId
-    ? await Promise.all([
-        prisma.rFQ.findMany({ where, include: { documents: true }, orderBy: { createdAt: 'desc' }, take: RECENT_RFQS }),
-        prisma.cARReport.findMany({ where, orderBy: { createdAt: 'desc' }, take: RECENT_CARS }),
-        prisma.scorecardPeriod.findMany({ where, orderBy: { period: 'desc' }, take: 1 }),
-      ]).catch((err) => {
-        console.error('[DashboardPage] dashboard queries failed', err);
-        return [[], [], []] as [[], [], []];
-      })
-    : [[], [], []];
-
-  const latestScore = scoreRows[0] ? toPortalScorecardPeriod(scoreRows[0]) : undefined;
-  const rfqs        = rfqRows.map(toPortalRFQ);
-  const cars        = carRows.map(toPortalCAR);
+  const latestScore = scoreResponse.data?.[0] ? toPortalScorecardPeriod(scoreResponse.data[0]) : undefined;
+  const rfqs = (rfqResponse.data ?? []).slice(0, RECENT_RFQS).map(toPortalRFQ);
+  const cars = (carResponse.data ?? []).slice(0, RECENT_CARS).map(toPortalCAR);
 
   return (
     <div style={{ padding: 'clamp(14px,3vw,28px)', maxWidth: 1300, margin: '0 auto' }}>

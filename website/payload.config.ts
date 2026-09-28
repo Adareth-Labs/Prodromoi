@@ -70,13 +70,13 @@ export default buildConfig({
             `${process.env.R2_PUBLIC_URL}/${prefix}/${filename}`,
         },
       },
-      bucket:   process.env.S3_CMS_BUCKET!,
+      bucket:   process.env.R2_CMS_BUCKET!,
       config: {
         region:      'auto',
-        endpoint:    process.env.S3_ENDPOINT!,
+        endpoint:    process.env.R2_ENDPOINT!,
         credentials: {
-          accessKeyId:     process.env.AWS_ACCESS_KEY_ID!,
-          secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+          accessKeyId:     process.env.R2_ACCESS_KEY_ID!,
+          secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
         },
       },
     }),

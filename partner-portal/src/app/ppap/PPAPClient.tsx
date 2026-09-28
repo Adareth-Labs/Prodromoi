@@ -4,25 +4,26 @@ import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { Badge, KPICard, SectionHeader, PrimaryButton, SecondaryButton, Spinner } from '@/components/ui';
 import { colors } from '@/styles/tokens';
 import type { PortalUser } from '@/types';
+import { apiFetch } from '@/lib/api';
 const C = colors;
 
 export default function PPAPClient({ user, initialDocs }: { user: PortalUser; initialDocs: any[] }) {
   const { mob, tab } = useBreakpoint();
   const [docs, setDocs] = useState(initialDocs);
   const [uploading, setUploading] = useState(false);
-  const [s3Log, setS3Log] = useState('');
+  const [r2Log, setR2Log] = useState('');
   const pad = mob ? 14 : tab ? 20 : 26;
 
   const handleUpload = async () => {
-    setUploading(true); setS3Log('');
+    setUploading(true); setR2Log('');
     try {
-      const res = await fetch('/api/ppap/upload-url', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileName: `ppap-doc-${Date.now()}.pdf`, contentType: 'application/pdf', ppapLevel: 3, sizeBytes: 2400000 }),
+      const json = await apiFetch<any>('/v1/ppap/upload-url', {
+        method: 'POST',
+        body: JSON.stringify({ documentType: 'PPAP_DOCUMENT', fileName: `ppap-doc-${Date.now()}.pdf`, contentType: 'application/pdf', ppapLevel: 3, sizeBytes: 2400000 }),
       });
-      const { uploadUrl, s3Key } = await res.json();
-      setS3Log(`PUT ${uploadUrl?.split('?')[0] ?? '...'}\nx-amz-server-side-encryption: AES256\n\n< HTTP/1.1 200 OK → Object stored [OK]`);
-      setDocs(p => [{ id: Date.now(), name: `New PPAP Document — ${new Date().toLocaleDateString()}`, fileType: 'PDF', sizeBytes: 2400000, ppapLevel: 3, status: 'UNDER_REVIEW', uploadedAt: new Date().toISOString(), s3Key }, ...p]);
+      const { uploadUrl, key } = json.data ?? {};
+      setR2Log(`R2 PUT ${uploadUrl?.split('?')[0] ?? '...'}\ncontent-type: application/pdf\n\nPre-signed upload URL authorized by Express API.`);
+      setDocs(p => [{ id: json.data?.documentId ?? Date.now(), name: `New PPAP Document — ${new Date().toLocaleDateString()}`, fileType: 'PDF', sizeBytes: 2400000, ppapLevel: 3, status: 'UNDER_REVIEW', uploadedAt: new Date().toISOString(), s3Key: key }, ...p]);
     } finally { setUploading(false); }
   };
 
@@ -71,7 +72,7 @@ export default function PPAPClient({ user, initialDocs }: { user: PortalUser; in
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
           <div style={{ background: C.surfaceCard, border: `1px solid ${C.borderLight}`, padding: 18 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: C.textDark, fontFamily: "'Hanken Grotesk', sans-serif", marginBottom: 14 }}>Upload to S3 Vault</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: C.textDark, fontFamily: "'Hanken Grotesk', sans-serif", marginBottom: 14 }}>Upload to R2 Vault</div>
             <div style={{ border: `2px dashed ${C.borderLight}`, padding: 24, textAlign: 'center', marginBottom: 12 }}>
               <span className="material-symbols-outlined" style={{ fontSize: 26, color: C.textFaint, display: 'block', marginBottom: 8 }}>cloud_upload</span>
               <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 3 }}>Drop PPAP documents here</div>
@@ -81,15 +82,15 @@ export default function PPAPClient({ user, initialDocs }: { user: PortalUser; in
               {uploading ? <><Spinner size={12} color={C.textDark} /> Generating URL...</> : 'Upload Document'}
             </SecondaryButton>
           </div>
-          {s3Log && (
+          {r2Log && (
             <div style={{ background: C.textDark, padding: 12 }}>
-              <div style={{ fontSize: 8, fontFamily: "'JetBrains Mono', monospace", color: `${C.blue}88`, marginBottom: 5, letterSpacing: '0.1em' }}>S3 UPLOAD LOG</div>
-              <pre style={{ fontSize: 8, fontFamily: "'JetBrains Mono', monospace", color: C.blue, margin: 0, lineHeight: '14px', whiteSpace: 'pre-wrap' as const }}>{s3Log}</pre>
+              <div style={{ fontSize: 8, fontFamily: "'JetBrains Mono', monospace", color: `${C.blue}88`, marginBottom: 5, letterSpacing: '0.1em' }}>R2 UPLOAD LOG</div>
+              <pre style={{ fontSize: 8, fontFamily: "'JetBrains Mono', monospace", color: C.blue, margin: 0, lineHeight: '14px', whiteSpace: 'pre-wrap' as const }}>{r2Log}</pre>
             </div>
           )}
           <div style={{ background: C.surfaceLow, border: `1px solid ${C.borderLight}`, padding: 13 }}>
             <div style={{ fontSize: 8, fontFamily: "'JetBrains Mono', monospace", color: C.textFaint, letterSpacing: '0.12em', textTransform: 'uppercase' as const, marginBottom: 8 }}>STORAGE CONFIG</div>
-            {[['Bucket','ppap-vault-eu-central-1'],['Encryption','AES-256 SSE'],['URL Expiry','3600s'],['Versioning','Enabled'],['Region','eu-central-1']].map(([k,v]) => (
+            {[['Bucket','ppap-vault'],['Encryption','AES-256 SSE'],['URL Expiry','3600s'],['Versioning','Enabled'],['Provider','Cloudflare R2']].map(([k,v]) => (
               <div key={k} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                 <span style={{ fontSize: 9, fontFamily: "'JetBrains Mono', monospace", color: C.textFaint }}>{k}</span>
                 <span style={{ fontSize: 9, fontFamily: "'JetBrains Mono', monospace", color: C.textMuted }}>{v}</span>

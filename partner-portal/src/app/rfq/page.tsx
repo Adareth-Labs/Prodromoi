@@ -1,5 +1,5 @@
 import { requirePortalUser } from '@/lib/auth';
-import { prisma } from '@/lib/db';
+import { apiFetchServer } from '@/lib/api-server';
 import { toPortalRFQ } from '@/lib/mappers';
 import Link from 'next/link';
 import { Badge, KPICard, SectionHeader, RBACGate } from '@/components/ui';
@@ -11,12 +11,11 @@ const C = colors;
 
 export default async function RFQListPage() {
   const user = await requirePortalUser();
-  const rows = user.tier >= 2 && user.supplierId ? await prisma.rFQ.findMany({
-    where: { supplierId: user.supplierId },
-    include: { documents: true },
-    orderBy: { createdAt: 'desc' },
-  }).catch((err) => { console.error('[RFQListPage] rfq query failed', err); return []; }) : [];
-  const rfqs = rows.map(toPortalRFQ);
+  const response = user.tier >= 2 ? await apiFetchServer<any>('/v1/rfq').catch((err) => {
+    console.error('[RFQListPage] API request failed', err);
+    return { data: [] };
+  }) : { data: [] };
+  const rfqs = (response.data ?? []).map(toPortalRFQ);
 
   const counts = {
     pending: rfqs.filter(r => r.status === 'PENDING').length,

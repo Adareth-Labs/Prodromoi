@@ -1,7 +1,6 @@
 import type { CollectionConfig } from 'payload'
 
-// No Payload equivalent existed before this — Contentful's `boardMember`
-// content type (used by the governance page) had nowhere to land.
+// Board-member records are managed directly in Payload CMS.
 export const BoardMembers: CollectionConfig = {
   slug: 'board-members',
   labels: { singular: 'Board member', plural: 'Board members' },
@@ -12,12 +11,6 @@ export const BoardMembers: CollectionConfig = {
   },
   access: { read: () => true },
   fields: [
-    {
-      name: 'contentfulId',
-      type: 'text',
-      unique: true,
-      admin: { hidden: true, description: 'Contentful entry sys.id — for migration dedupe only' },
-    },
     {
       name: 'name',
       type: 'text',

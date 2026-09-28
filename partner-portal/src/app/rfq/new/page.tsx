@@ -2,7 +2,7 @@
 // src/app/rfq/new/page.tsx
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
+import { apiFetch, getPortalUserClient } from '@/lib/api';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
 import {
   SectionHeader, FieldLabel, TextInput, SelectInput, TextArea,
@@ -28,7 +28,6 @@ type UploadedFile = { name: string; type: string; size: string; s3Key: string };
 export default function RFQNewPage() {
   const router = useRouter();
   const { mob, tab } = useBreakpoint();
-  const supabase = createClient();
 
   const [user, setUser]       = useState<PortalUser | null>(null);
   const [step, setStep]       = useState(1);
@@ -39,6 +38,7 @@ export default function RFQNewPage() {
   const [s3Log, setS3Log]           = useState('');
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [formError, setFormError] = useState('');
+  const [draftId, setDraftId] = useState<string | null>(null);
 
   const [form, setForm] = useState<FormState>({
     partNumber: '', partName: '', annualVolume: '', targetPrice: '',
@@ -46,72 +46,67 @@ export default function RFQNewPage() {
     drawingRef: '', requiredBy: '', notes: '',
   });
 
-  // Load the Supabase user + vendor data on mount
+  // Supabase authenticates the browser; Express supplies the supplier profile.
   useEffect(() => {
-    supabase.auth.getUser().then(async ({ data: { user: sbUser } }) => {
-      if (!sbUser) { router.push('/login'); return; }
-      try {
-        // Fetch vendor record from our API so we have tier/company/vendorId
-        const res = await fetch('/api/me');
-        if (res.ok) {
-          const { data } = await res.json();
-          setUser(data);
-        } else {
-          setFormError('Could not load your profile. Please refresh the page.');
-        }
-      } catch (err) {
-        console.error('[RFQNewPage] failed to load profile', err);
-        setFormError('Could not load your profile. Please refresh the page.');
-      }
+    getPortalUserClient().then((portalUser) => {
+      if (!portalUser) router.push('/login');
+      else setUser(portalUser);
     }).catch((err) => {
-      console.error('[RFQNewPage] Supabase auth check failed', err);
-      router.push('/login');
+      console.error('[RFQNewPage] profile lookup failed', err);
+      setFormError('Could not load your profile. Please refresh the page.');
     });
-  }, []);
+  }, [router]);
 
   const set = (k: keyof FormState) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
       setForm(p => ({ ...p, [k]: e.target.value }));
 
+  const ensureDraft = async () => {
+    if (draftId) return draftId;
+    const payload = {
+      partNumber: form.partNumber || 'PT-7A-CRANK-001',
+      partName: form.partName || 'Precision Crankshaft Assembly',
+      annualVolume: parseInt(form.annualVolume || '45000'),
+      targetPrice: parseFloat(form.targetPrice || '124.00'),
+      material: form.material !== 'Select...' ? form.material : undefined,
+      toleranceClass: form.toleranceClass !== 'Select...' ? form.toleranceClass : undefined,
+      drawingRef: form.drawingRef || undefined,
+      requiredBy: form.requiredBy ? new Date(form.requiredBy).toISOString() : undefined,
+      notes: form.notes || undefined,
+    };
+    const json = await apiFetch<any>('/v1/rfq', { method: 'POST', body: JSON.stringify(payload) });
+    const id = json.data?.id as string | undefined;
+    if (!id) throw new Error('API did not return the RFQ id');
+    setDraftId(id);
+    return id;
+  };
+
   const handleUpload = async (docType: string) => {
     setUploading(docType); setS3Log(''); setFormError('');
     try {
-      const res = await fetch('/api/rfq/upload-url', {
+      const rfqId = await ensureDraft();
+      const fileName = `${docType.replace(/\W+/g,'-').toLowerCase()}-${Date.now()}.pdf`;
+      const json = await apiFetch<any>(`/v1/rfq/${rfqId}/documents/upload-url`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileName: `${docType.replace(/\W+/g,'-').toLowerCase()}.pdf`, contentType: 'application/pdf', sizeBytes: 4_200_000 }),
+        body: JSON.stringify({ fileName, contentType: 'application/pdf', sizeBytes: 4_200_000 }),
       });
-      if (!res.ok) throw new Error(`Upload URL request failed with status ${res.status}`);
-      const { uploadUrl, s3Key } = await res.json();
-      setS3Log(`PUT ${uploadUrl?.split('?')[0] ?? '...'}\nx-amz-server-side-encryption: AES256\n\n< HTTP/1.1 200 OK → Object stored [OK]`);
-      setUploadedFiles(p => [...p, { name: `${docType.toLowerCase().replace(/\W+/g,'-')}-${Date.now()}.pdf`, type: docType, size: `${(Math.random()*7+0.5).toFixed(1)} MB`, s3Key }]);
+      const { uploadUrl, key } = json.data ?? {};
+      setS3Log(`R2 PUT ${uploadUrl?.split('?')[0] ?? '...'}\ncontent-type: application/pdf\n\nPre-signed upload URL authorized by Express API.`);
+      setUploadedFiles(p => [...p, { name: fileName, type: docType, size: '4.2 MB', s3Key: key }]);
     } catch (err) {
       console.error('[RFQNewPage] upload failed', err);
-      setFormError(`Failed to upload ${docType}. Please try again.`);
+      setFormError(`Failed to prepare ${docType} upload. Please try again.`);
     } finally { setUploading(null); }
   };
 
   const handleSubmit = async () => {
     setSubmitting(true); setFormError('');
     try {
-      const body: CreateRFQInput = {
-        partNumber:    form.partNumber    || 'PT-7A-CRANK-001',
-        partName:      form.partName      || 'Precision Crankshaft Assembly',
-        annualVolume:  parseInt(form.annualVolume  || '45000'),
-        targetPrice:   parseFloat(form.targetPrice || '124.00'),
-        material:      form.material     !== 'Select...' ? form.material      : undefined,
-        toleranceClass:form.toleranceClass !== 'Select...' ? form.toleranceClass : undefined,
-        drawingRef:    form.drawingRef   || undefined,
-        requiredBy:    form.requiredBy   || undefined,
-        notes:         form.notes        || undefined,
-      };
-      const res = await fetch('/api/rfq', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+      const id = await ensureDraft();
+      const json = await apiFetch<any>(`/v1/rfq/${id}/transition`, {
+        method: 'POST', body: JSON.stringify({ event: 'SUBMIT' }),
       });
-      if (!res.ok) throw new Error(`RFQ submission failed with status ${res.status}`);
-      const json = await res.json();
-      setRefId(json.data?.referenceId ?? 'RFQ-2024-0001');
+      setRefId(json.data?.trackingId ?? 'RFQ');
       setDone(true);
     } catch (err) {
       console.error('[RFQNewPage] submission failed', err);
@@ -231,7 +226,7 @@ export default function RFQNewPage() {
             <div>
               <div style={{ marginBottom:16 }}>
                 <div style={{ fontSize:14, fontWeight:600, color:C.textDark, fontFamily:"'Hanken Grotesk',sans-serif", marginBottom:4 }}>Documentation Upload</div>
-                <div style={{ fontSize:13, color:C.textMuted }}>Each file triggers a pre-signed S3 URL via the API.</div>
+                <div style={{ fontSize:13, color:C.textMuted }}>Each file triggers a pre-signed Cloudflare R2 URL via the Express API.</div>
               </div>
               {DOC_TYPES.map(t => (
                 <div key={t} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 13px', border:`1px solid ${C.borderLight}`, background:C.surfaceCard, marginBottom:8, gap:10 }}>
@@ -250,7 +245,7 @@ export default function RFQNewPage() {
               ))}
               {s3Log && (
                 <div style={{ background:C.textDark, padding:12, marginTop:10 }}>
-                  <div style={{ fontSize:8, fontFamily:"'JetBrains Mono',monospace", color:`${C.blue}88`, marginBottom:5, letterSpacing:'0.1em' }}>PRE-SIGNED S3 URL GENERATED</div>
+                  <div style={{ fontSize:8, fontFamily:"'JetBrains Mono',monospace", color:`${C.blue}88`, marginBottom:5, letterSpacing:'0.1em' }}>PRE-SIGNED R2 URL GENERATED</div>
                   <pre style={{ fontSize:8, fontFamily:"'JetBrains Mono',monospace", color:C.blue, margin:0, lineHeight:'14px', whiteSpace:'pre-wrap' }}>{s3Log}</pre>
                 </div>
               )}

@@ -5,13 +5,13 @@ import { auditService } from '@/services/audit/AuditService'
 import type { PortalTier } from '@/types'
 import { randomUUID } from 'crypto'
 
-// Cloudflare R2 is S3-compatible — only differences are:
+// Cloudflare R2 uses the S3-compatible API — key differences from standard S3 endpoints are:
 //   region: 'auto'  (R2 doesn't use AWS regions)
 //   endpoint: your account's R2 endpoint
-const s3 = new S3Client({
+const r2 = new S3Client({
   region:      'auto',
-  endpoint:    env.S3_ENDPOINT,
-  credentials: { accessKeyId: env.AWS_ACCESS_KEY_ID, secretAccessKey: env.AWS_SECRET_ACCESS_KEY },
+  endpoint:    env.R2_ENDPOINT,
+  credentials: { accessKeyId: env.R2_ACCESS_KEY_ID, secretAccessKey: env.R2_SECRET_ACCESS_KEY },
 })
 
 // Upload windows are short-lived on purpose — the client is expected to
@@ -62,23 +62,23 @@ class DocumentService {
     expiresIn = UPLOAD_URL_EXPIRY_SECONDS,
   }: GetUploadUrlInput): Promise<string> {
     const command = new PutObjectCommand({
-      Bucket:      env.S3_DOCUMENTS_BUCKET,
+      Bucket:      env.R2_DOCUMENTS_BUCKET,
       Key:         key,
       ContentType: contentType,
     })
-    return getSignedUrl(s3, command, { expiresIn })
+    return getSignedUrl(r2, command, { expiresIn })
   }
 
   async getDownloadUrl({
     key,
-    expiresIn = env.S3_PRESIGN_EXPIRY,
+    expiresIn = env.R2_PRESIGN_EXPIRY,
   }: GetDownloadUrlInput): Promise<string> {
-    const command = new GetObjectCommand({ Bucket: env.S3_DOCUMENTS_BUCKET, Key: key })
-    return getSignedUrl(s3, command, { expiresIn })
+    const command = new GetObjectCommand({ Bucket: env.R2_DOCUMENTS_BUCKET, Key: key })
+    return getSignedUrl(r2, command, { expiresIn })
   }
 
   async delete(key: string): Promise<void> {
-    await s3.send(new DeleteObjectCommand({ Bucket: env.S3_DOCUMENTS_BUCKET, Key: key }))
+    await r2.send(new DeleteObjectCommand({ Bucket: env.R2_DOCUMENTS_BUCKET, Key: key }))
   }
 
   // Log every document download for IATF 16949 compliance

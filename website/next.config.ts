@@ -6,7 +6,7 @@ const nextConfig: NextConfig = {
 
   allowedDevOrigins: ['192.168.0.116'],
 
-  // Image optimisation — updated from Contentful/S3 to Cloudflare R2
+  // Image optimisation — updated from legacy CMS data/S3 to Cloudflare R2
   images: {
     remotePatterns: [
       {

@@ -28,11 +28,5 @@ export const Media: CollectionConfig = {
       type: 'text',
       label: 'Caption',
     },
-    {
-      name: 'contentfulId',
-      type: 'text',
-      unique: true,
-      admin: { hidden: true, description: 'Contentful asset sys.id — set only for migrated assets, used to dedupe re-runs of the migration' },
-    },
   ],
 }

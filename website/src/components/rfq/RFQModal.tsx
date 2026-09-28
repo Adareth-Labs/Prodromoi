@@ -18,10 +18,12 @@ const STEP_LABELS: Record<number, string> = {
 }
 
 const PORTAL_URL = process.env.NEXT_PUBLIC_PORTAL_URL ?? 'https://portal.precisioncore.com'
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001'
 
 export function RFQModal({ open, productSlug, onClose }: Props) {
   const [step, setStep] = useState<Step>(1)
   const [loading, setLoading] = useState(false)
+  const [trackingId, setTrackingId] = useState('')
   const dialogRef = useRef<HTMLDivElement>(null)
 
   // Lock body scroll and manage focus when open
@@ -51,11 +53,16 @@ export function RFQModal({ open, productSlug, onClose }: Props) {
   async function handleSubmit() {
     setLoading(true)
     try {
-      await fetch('/api/rfq', {
+      const response = await fetch(`${API_BASE_URL}/v1/public/rfq`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Source': 'public-site' },
         body: JSON.stringify({ productSlug, step: 3 }),
       })
+      const json = await response.json().catch(() => ({}))
+      if (!response.ok || !json?.data?.trackingId) {
+        throw new Error(json?.error ?? 'RFQ submission failed')
+      }
+      setTrackingId(json.data.trackingId)
       setStep('confirmed')
     } finally {
       setLoading(false)
@@ -191,7 +198,7 @@ export function RFQModal({ open, productSlug, onClose }: Props) {
             <span className="material-symbols-outlined text-5xl text-success block mb-4" aria-hidden="true">check_circle</span>
             <h2 className="text-2xl font-medium mb-2">Submission Received</h2>
             <div className="section-label mb-2">RFQ Tracking ID</div>
-            <div className="text-3xl font-medium tracking-tight mb-6">RFQ-{Date.now().toString().slice(-6)}</div>
+            <div className="text-3xl font-medium tracking-tight mb-6">{trackingId || 'RFQ'}</div>
             <p className="text-sm text-ink-secondary mb-6">
               Our procurement team will respond within <strong>5 business days</strong>.
               Track status via the Partner Portal.

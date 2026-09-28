@@ -1,4 +1,4 @@
-import { getInvestorDocuments } from '@/lib/s3/client'
+import { getInvestorDocuments } from '@/lib/r2/client'
 import { format } from 'date-fns'
 import type { Metadata } from 'next'
 

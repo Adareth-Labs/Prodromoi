@@ -106,7 +106,7 @@ model RFQ {
   id          String    @id @default(uuid())
   trackingId  String    @unique // e.g. RFQ-2024-X99
   supplierId  String
-  productSlug String?   // Reference to Contentful solution slug
+  productSlug String?   // Reference to the Payload solution slug
   partFamily  String
   sku         String?
 

@@ -1,18 +1,18 @@
 import { revalidatePath, revalidateTag } from 'next/cache'
 import { NextRequest, NextResponse } from 'next/server'
 
-// Contentful webhook calls this endpoint after publishing
+// Payload CMS webhook calls this endpoint after publishing
 // Validates the shared secret before revalidating
 
 export async function POST(req: NextRequest) {
-  const secret = req.headers.get('x-contentful-webhook-secret')
-  if (secret !== process.env.CONTENTFUL_WEBHOOK_SECRET) {
+  const secret = req.headers.get('x-cms-webhook-secret')
+  if (secret !== process.env.REVALIDATION_SECRET) {
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
   }
 
   try {
     const body = await req.json()
-    const contentType = body?.sys?.contentType?.sys?.id as string | undefined
+    const contentType = (body?.collection ?? body?.doc?.collection ?? body?.data?.collection ?? body?.type) as string | undefined
 
     const pathMap: Record<string, string[]> = {
       solution:          ['/solutions', '/solutions/[slug]'],

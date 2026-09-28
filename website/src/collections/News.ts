@@ -44,7 +44,7 @@ export const News: CollectionConfig = {
     {
       name: 'type',
       type: 'select',
-      admin: { description: 'What kind of item this is — separate from Topic category below, which is what it\'s about. Optional: Contentful never captured this, so migrated items may have none.' },
+      admin: { description: 'What kind of item this is — separate from Topic category below, which is what it\'s about. Optional field; legacy records may not have a value.' },
       options: [
         { label: 'Press release',  value: 'press-release' },
         { label: 'Award',          value: 'award' },
@@ -57,7 +57,7 @@ export const News: CollectionConfig = {
       name: 'topicCategory',
       type: 'select',
       label: 'Topic category',
-      admin: { description: 'Subject area (Contentful "category") — also what the newsroom sidebar counts should group by' },
+      admin: { description: 'Subject area (legacy category) — also what the newsroom sidebar counts should group by' },
       options: [
         { label: 'Technical',     value: 'technical' },
         { label: 'Corporate',     value: 'corporate' },

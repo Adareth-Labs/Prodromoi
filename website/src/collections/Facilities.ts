@@ -11,12 +11,6 @@ export const Facilities: CollectionConfig = {
   access: { read: () => true },
   fields: [
     {
-      name: 'contentfulId',
-      type: 'text',
-      unique: true,
-      admin: { hidden: true, description: 'Contentful entry sys.id — for migration dedupe only' },
-    },
-    {
       name: 'name',
       type: 'text',
       required: true,

@@ -19,12 +19,13 @@ const FALLBACK_HISTORY = [
   {d:'THU',util:94,oee:88},{d:'FRI',util:70,oee:84},{d:'SAT',util:65,oee:81},{d:'SUN',util:58,oee:79},
 ];
 
-export default function CapacityClient({ user, lines: serverLines }: { user: PortalUser; lines: any[] }) {
+export default function CapacityClient({ user, lines: serverLines, history: serverHistory, overallOEE }: { user: PortalUser; lines: any[]; history: any[]; overallOEE: number }) {
   const { mob, tab } = useBreakpoint();
   const [timeRange, setTimeRange] = useState('7D');
   const lines = serverLines.length > 0 ? serverLines : FALLBACK_LINES;
+  const history = serverHistory.length > 0 ? serverHistory.map((h:any)=>({d:h.day, util:h.utilization, oee:h.oee})) : FALLBACK_HISTORY;
   const pad = mob ? 14 : tab ? 20 : 26;
-  const oee = lines.filter(l=>l.status!=='MAINTENANCE').reduce((s,l)=>s+l.oee,0)/(lines.filter(l=>l.status!=='MAINTENANCE').length||1);
+  const oee = overallOEE || (lines.filter(l=>l.status!=='MAINTENANCE').reduce((s,l)=>s+l.oee,0)/(lines.filter(l=>l.status!=='MAINTENANCE').length||1));
 
   const CapTip = ({ active, payload, label }: any) => active && payload?.length ? (
     <div style={{ background: C.textDark, padding: '8px 12px' }}>
@@ -58,7 +59,7 @@ export default function CapacityClient({ user, lines: serverLines }: { user: Por
           <div style={{ padding: mob?14:18 }}>
             <div style={{ fontSize: 9, fontFamily: "'JetBrains Mono', monospace", color: C.red, textAlign: 'right', marginBottom: 4 }}>— CRITICAL THRESHOLD (85%)</div>
             <ResponsiveContainer width="100%" height={mob?180:230}>
-              <BarChart data={FALLBACK_HISTORY} margin={{ top:5, right:0, bottom:0, left:-24 }}>
+              <BarChart data={history} margin={{ top:5, right:0, bottom:0, left:-24 }}>
                 <CartesianGrid strokeDasharray="2 4" stroke={C.borderLight} vertical={false} />
                 <XAxis dataKey="d" tick={{ fontSize:8, fontFamily:"'JetBrains Mono',monospace", fill:C.textFaint }} axisLine={false} tickLine={false} />
                 <YAxis domain={[0,100]} tick={{ fontSize:8, fontFamily:"'JetBrains Mono',monospace", fill:C.textFaint }} axisLine={false} tickLine={false} tickFormatter={(v:number)=>`${v}%`} />
@@ -74,7 +75,7 @@ export default function CapacityClient({ user, lines: serverLines }: { user: Por
             <div style={{ fontSize: 28, fontFamily: "'Hanken Grotesk', sans-serif", fontWeight: 700, color: C.textDark }}>{oee.toFixed(1)}<span style={{ fontSize: 14, fontWeight: 400, color: C.textFaint }}>%</span></div>
             <div style={{ fontSize: 11, color: C.green, marginBottom: 8 }}>↑ 2.1% from prev. shift</div>
             <ResponsiveContainer width="100%" height={70}>
-              <AreaChart data={FALLBACK_HISTORY}>
+              <AreaChart data={history}>
                 <Area type="monotone" dataKey="oee" stroke={C.textDark} fill={`${C.textDark}12`} strokeWidth={1.5} dot={false} />
                 <XAxis dataKey="d" hide /><YAxis domain={[70,100]} hide />
               </AreaChart>

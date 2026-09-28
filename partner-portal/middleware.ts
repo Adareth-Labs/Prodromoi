@@ -10,14 +10,6 @@ type CookieToSet = { name: string; value: string; options?: Partial<ResponseCook
  * Tier is stored in user.app_metadata.tier (set via Supabase admin SDK
  * or a custom access-token hook — see README).
  */
-const TIER_REQUIREMENTS: Record<string, number> = {
-  '/rfq':       2,
-  '/ppap':      2,
-  '/scorecard': 2,
-  '/car':       3,
-  '/capacity':  3,
-};
-
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -76,19 +68,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // RBAC: read tier from JWT app_metadata (no extra DB round-trip)
-  if (user) {
-    const tier = (user.app_metadata?.tier as number) ?? 1;
-    for (const [route, minTier] of Object.entries(TIER_REQUIREMENTS)) {
-      if (pathname.startsWith(route) && tier < minTier) {
-        const url = request.nextUrl.clone();
-        url.pathname = '/dashboard';
-        url.searchParams.set('error', 'insufficient_tier');
-        url.searchParams.set('required', String(minTier));
-        return NextResponse.redirect(url);
-      }
-    }
-  }
+
 
   return supabaseResponse;
 }

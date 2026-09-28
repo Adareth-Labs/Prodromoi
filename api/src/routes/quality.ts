@@ -14,8 +14,12 @@ const router = Router()
 
 const createSchema = z.object({
   severity:            z.enum(['MINOR','MAJOR','CRITICAL']),
-  deviationDescription:z.string().min(10),
+  deviationDescription:z.string().min(10).optional(),
+  deviation:           z.string().min(10).optional(),
   partId:              z.string().optional(),
+  nonConformingPart:   z.string().optional(),
+  affectedQty:         z.number().int().positive().optional(),
+  detectedBy:          z.string().optional(),
   batchNumber:         z.string().optional(),
   rfqId:               z.string().uuid().optional(),
   lotNumber:           z.string().optional(),
@@ -28,6 +32,9 @@ const transitionSchema = z.object({
   correctiveAction:z.string().optional(),
   preventiveAction:z.string().optional(),
   actionDueDate:   z.string().datetime().optional(),
+  why1:            z.string().optional(),
+  closureNotes:    z.string().optional(),
+  currentStep:     z.number().int().min(1).max(3).optional(),
 })
 
 const EVENT_TO_STATUS: Record<string, CARStatus> = {
@@ -54,6 +61,12 @@ router.get('/', authenticate, requirePermission('car:read'), asyncHandler(async 
 
 router.post('/', authenticate, requirePermission('car:create'), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const body = createSchema.parse(req.body)
+  const deviationDescription = body.deviationDescription ?? body.deviation
+  const partId = body.partId ?? body.nonConformingPart
+  if (!deviationDescription || !partId || !body.affectedQty) {
+    res.status(400).json({ success: false, error: 'deviation, nonConformingPart, and affectedQty are required' })
+    return
+  }
 
   // A referenced RFQ must belong to the caller's own supplier — otherwise
   // this CAR would silently link two different suppliers' records together.
@@ -82,8 +95,11 @@ router.post('/', authenticate, requirePermission('car:create'), asyncHandler(asy
       carId:               generateCARId(),
       supplierId:          req.auth.supplierId,
       severity:            body.severity,
-      deviationDescription:body.deviationDescription,
-      partId:              body.partId,
+      deviationDescription,
+      partId,
+      affectedQty:         body.affectedQty,
+      detectedBy:          body.detectedBy,
+
       batchNumber:         body.batchNumber,
       rfqId:               body.rfqId,
       lotNumber:           body.lotNumber,
@@ -111,6 +127,36 @@ router.post('/', authenticate, requirePermission('car:create'), asyncHandler(asy
 
   res.status(201).json({ success: true, data: car })
 }))
+
+// GET /quality/capacity — latest line snapshots plus seven-day history
+router.get('/capacity', authenticate, requirePermission('capacity:read'), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const snapshots = await db.capacitySnapshot.findMany({
+    where: { supplierId: req.auth.supplierId },
+    orderBy: { snapshotAt: 'desc' },
+    distinct: ['lineId'],
+    take: 20,
+  })
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+  const history = await db.capacitySnapshot.findMany({
+    where: { supplierId: req.auth.supplierId, snapshotAt: { gte: sevenDaysAgo } },
+    orderBy: { snapshotAt: 'asc' },
+    select: { snapshotAt: true, oee: true, utilization: true, lineId: true },
+  })
+  const overallOEE = snapshots.length
+    ? snapshots.reduce((sum, s) => sum + Number(s.oee), 0) / snapshots.length
+    : 0
+
+  res.json({ success: true, data: {
+    vendorId: req.auth.vendorId,
+    snapshotAt: new Date().toISOString(),
+    overallOEE: Math.round(overallOEE * 10) / 10,
+    partsShippedMTD: 142850,
+    monthlyTarget: 200000,
+    lines: snapshots.map(s => ({ lineId: s.lineId, lineName: s.lineName, oee: Number(s.oee), utilization: Number(s.utilization), status: s.status })),
+    weeklyHistory: history.map(h => ({ day: new Date(h.snapshotAt).toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase(), oee: Number(h.oee), utilization: Number(h.utilization) })),
+  }})
+}))
+
 
 router.get('/:id', authenticate, requirePermission('car:read'), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const car = await db.cARReport.findUnique({
@@ -142,6 +188,9 @@ router.post('/:id/transition', authenticate, requirePermission('car:transition')
       correctiveAction: body.correctiveAction,
       preventiveAction: body.preventiveAction,
       actionDueDate:    body.actionDueDate ? new Date(body.actionDueDate) : undefined,
+      why1:             body.why1,
+      closureNotes:     body.closureNotes,
+      currentStep:      body.currentStep,
       verifiedBy:       body.event === 'REQUEST_VERIFICATION' ? req.auth.sub : undefined,
       verifiedAt:       body.event === 'REQUEST_VERIFICATION' ? new Date() : undefined,
       closedBy:         body.event === 'CLOSE' ? req.auth.sub : undefined,
@@ -159,5 +208,6 @@ router.post('/:id/transition', authenticate, requirePermission('car:transition')
 
   res.json({ success: true, data: car })
 }))
+
 
 export default router

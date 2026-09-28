@@ -28,7 +28,7 @@ async function respondWithDownload(req: AuthenticatedRequest, res: Response, key
   })
   // Report the URL's *actual* configured lifetime instead of a hardcoded
   // number, so this can never drift from what getDownloadUrl really signed.
-  res.json({ success: true, data: { downloadUrl, key, expiresIn: env.S3_PRESIGN_EXPIRY } })
+  res.json({ success: true, data: { downloadUrl, key, expiresIn: env.R2_PRESIGN_EXPIRY } })
 }
 
 router.get('/certs/:certId', authenticate, requirePermission('document:certs'), downloadLimiter, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {

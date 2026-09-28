@@ -2,9 +2,6 @@ import { Suspense } from 'react'
 import { MetricsBar } from '@/components/home/MetricsBar'
 import { TechnicalPillars } from '@/components/home/TechnicalPillars'
 import { NewsroomFeed } from '@/components/home/NewsroomFeed'
-// 1. Comment out the CMS imports temporarily
-// import { getSiteMetrics } from '@/lib/contentful/queries'
-// import { getNewsArticles } from '@/lib/contentful/queries'
 import Link from 'next/link'
 import type { Metadata } from 'next'
 
@@ -16,13 +13,6 @@ export const metadata: Metadata = {
 }
 
 export default async function HomePage() {
-  // 2. Comment out the real fetch
-  /*
-  const [metrics, newsData] = await Promise.all([
-    getSiteMetrics(),
-    getNewsArticles({ limit: 3 }),
-  ])
-  */
 
   // Demonstration metrics: illustrative portfolio data, not real company figures.
   const metrics = {
@@ -34,7 +24,6 @@ export default async function HomePage() {
   }
 
   // Demonstration newsroom data for the portfolio case study.
-// Demonstration newsroom data
   const newsData = {
     items: [
       {

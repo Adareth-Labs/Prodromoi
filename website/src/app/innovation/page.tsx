@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { getInnovationArticles } from '@/lib/contentful/queries'
+import { getInnovationArticles } from '@/lib/payload/api'
 import { Badge } from '@/components/ui/Badge'
 import type { Metadata } from 'next'
 

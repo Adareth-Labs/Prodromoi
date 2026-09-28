@@ -1,5 +1,5 @@
 import { requirePortalUser } from '@/lib/auth';
-import { prisma } from '@/lib/db';
+import { apiFetchServer } from '@/lib/api-server';
 import { toPortalScorecardPeriod } from '@/lib/mappers';
 import ScorecardClient from './ScorecardClient';
 import type { Metadata } from 'next';
@@ -9,10 +9,10 @@ const SCORECARD_MONTHS = 12;
 
 export default async function ScorecardPage() {
   const user = await requirePortalUser({ minTier: 2 });
-  const rows = user.supplierId ? await prisma.scorecardPeriod.findMany({
-    where: { supplierId: user.supplierId },
-    orderBy: { period: 'desc' },
-    take: SCORECARD_MONTHS,
-  }).catch((err) => { console.error('[ScorecardPage] periods query failed', err); return []; }) : [];
+  const response = await apiFetchServer<any>('/v1/suppliers/me/scorecard/periods').catch((err) => {
+    console.error('[ScorecardPage] API request failed', err);
+    return { data: [] };
+  });
+  const rows = (response.data ?? []).slice(0, SCORECARD_MONTHS);
   return <ScorecardClient user={user} periods={rows.map(toPortalScorecardPeriod)} company={user.company} />;
 }

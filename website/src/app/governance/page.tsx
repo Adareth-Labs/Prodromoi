@@ -1,4 +1,4 @@
-import { getBoardMembers } from '@/lib/contentful/queries'
+import { getBoardMembers } from '@/lib/payload/api'
 import type { Metadata } from 'next'
 export const revalidate = parseInt(process.env.REVALIDATE_COMPANY ?? '86400', 10)
 export const metadata: Metadata = { title: 'Corporate Governance', description: 'Board of directors, committee structure, and published governance policies.' }

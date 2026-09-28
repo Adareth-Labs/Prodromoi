@@ -3,7 +3,7 @@ import {
   getAllSolutionSlugs,
   getAllInnovationSlugs,
   getAllNewsSlugs,
-} from '@/lib/contentful/queries'
+} from '@/lib/payload/api'
 
 export const revalidate = 3600
 

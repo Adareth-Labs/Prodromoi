@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import { Badge } from '@/components/ui/Badge'
-import { getInnovationArticleBySlug, getAllInnovationSlugs } from '@/lib/contentful/queries'
-import { documentToReactComponents } from '@contentful/rich-text-react-renderer'
+import { getInnovationArticleBySlug, getAllInnovationSlugs } from '@/lib/payload/api'
+import { documentToReactComponents } from '@/components/RichText'
 import type { Metadata } from 'next'
 
 export const revalidate = 3600

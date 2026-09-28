@@ -27,3 +27,12 @@ export const rfqLimiter = rateLimit({
   max:      RFQ_RATE_LIMIT_MAX,
   message: { success: false, error: 'RFQ submission limit reached.' },
 })
+
+// Public website RFQ intake — intentionally unauthenticated, protected by CORS + strict per-IP limiting.
+export const publicRfqLimiter = rateLimit({
+  windowMs: ONE_HOUR_MS,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: 'RFQ submission limit reached.' },
+})

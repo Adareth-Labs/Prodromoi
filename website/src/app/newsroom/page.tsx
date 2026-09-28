@@ -1,4 +1,4 @@
-import { getNewsArticles } from '@/lib/contentful/queries'
+import { getNewsArticles } from '@/lib/payload/api'
 import { ArticleRow } from '@/components/shared/ArticleRow'
 import { Badge } from '@/components/ui/Badge'
 import type { Metadata } from 'next'

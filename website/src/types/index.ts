@@ -1,13 +1,13 @@
-// ── CONTENTFUL BASE ───────────────────────────────────────────────────────────
+// ── SHARED CONTENT TYPES ─────────────────────────────────────────────────────
 
-export interface ContentfulSys {
+export interface EntityMeta {
   id: string
   createdAt: string
   updatedAt: string
 }
 
-export interface ContentfulAsset {
-  sys: ContentfulSys
+export interface MediaAsset {
+  sys: EntityMeta
   fields: {
     title: string
     description?: string
@@ -61,7 +61,7 @@ export interface SpecificationRow {
 }
 
 export interface Solution {
-  sys: ContentfulSys
+  sys: EntityMeta
   slug: string
   name: string
   partFamily: string
@@ -73,7 +73,7 @@ export interface Solution {
   fullDescription: string
   specifications: SpecificationRow[]
   oemCompatibility: string[]
-  heroImage?: ContentfulAsset
+  heroImage?: MediaAsset
   technicalDataSheetUrl?: string
   featuredOnHomepage: boolean
   metaTitle?: string
@@ -92,7 +92,7 @@ export type InnovationCategory =
   | 'circular-economy'
 
 export interface InnovationArticle {
-  sys: ContentfulSys
+  sys: EntityMeta
   slug: string
   title: string
   category: InnovationCategory
@@ -101,10 +101,10 @@ export interface InnovationArticle {
   publishedAt: string
   readTimeMinutes: number
   summary: string
-  body: unknown // Contentful Rich Text document
-  heroImage?: ContentfulAsset
+  body: unknown // Rich text document
+  heroImage?: MediaAsset
   isWhitePaper: boolean
-  whitePaperAsset?: ContentfulAsset
+  whitePaperAsset?: MediaAsset
   featuredOnHomepage: boolean
   metaTitle?: string
   metaDescription?: string
@@ -120,7 +120,7 @@ export type NewsCategory =
   | 'partnerships'
 
 export interface NewsArticle {
-  sys: ContentfulSys
+  sys: EntityMeta
   slug: string
   title: string
   category: NewsCategory
@@ -128,8 +128,8 @@ export interface NewsArticle {
   publishedAt: string
   readTimeMinutes: number
   summary: string
-  body: unknown // Contentful Rich Text document
-  heroImage?: ContentfulAsset
+  body: unknown // Rich text document
+  heroImage?: MediaAsset
   featuredMaterial: boolean
   metaTitle?: string
   metaDescription?: string
@@ -138,17 +138,17 @@ export interface NewsArticle {
 // ── COMPANY ───────────────────────────────────────────────────────────────────
 
 export interface LeadershipProfile {
-  sys: ContentfulSys
+  sys: EntityMeta
   name: string
   title: string
   bio: string
-  photo?: ContentfulAsset
+  photo?: MediaAsset
   linkedInUrl?: string
   sortOrder: number
 }
 
 export interface Facility {
-  sys: ContentfulSys
+  sys: EntityMeta
   name: string
   city: string
   country: string
@@ -162,7 +162,7 @@ export interface Facility {
 }
 
 export interface BoardMember {
-  sys: ContentfulSys
+  sys: EntityMeta
   name: string
   title: string
   committee?: string
@@ -220,7 +220,7 @@ export interface InvestorCalendarEvent {
   webcastUrl?: string
 }
 
-// ── SITE METRICS (from Contentful) ────────────────────────────────────────────
+// ── SITE METRICS (from legacy CMS data) ────────────────────────────────────────────
 
 export interface SiteMetrics {
   revenueRunRate: string

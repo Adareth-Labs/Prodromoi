@@ -58,7 +58,7 @@ export const Articles: CollectionConfig = {
       name: 'topicCategory',
       type: 'select',
       label: 'Topic category',
-      admin: { description: 'Innovation topic (Contentful "category") — a different classification than Domain above' },
+      admin: { description: 'Innovation topic (legacy category) — a different classification than Domain above' },
       options: [
         { label: 'Software-defined vehicle', value: 'software-defined-vehicle' },
         { label: 'Electrification',          value: 'electrification' },

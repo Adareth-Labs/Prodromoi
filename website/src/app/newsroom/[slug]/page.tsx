@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import { Badge } from '@/components/ui/Badge'
-import { getNewsArticleBySlug, getAllNewsSlugs } from '@/lib/contentful/queries'
-import { documentToReactComponents } from '@contentful/rich-text-react-renderer'
+import { getNewsArticleBySlug, getAllNewsSlugs } from '@/lib/payload/api'
+import { documentToReactComponents } from '@/components/RichText'
 import { format } from 'date-fns'
 import type { Metadata } from 'next'
 

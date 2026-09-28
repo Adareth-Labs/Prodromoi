@@ -8,7 +8,7 @@ Next.js 14 public marketing site. App Router, TypeScript, Tailwind CSS.
 |-------|-----------|
 | Framework | Next.js 14 (App Router) |
 | Styling | Tailwind CSS — Achromatic Industrial design system |
-| CMS | Contentful (delivery + preview + webhooks) |
+| CMS | Payload CMS (delivery + preview + webhooks) |
 | Investor docs | AWS S3 + pre-signed URLs |
 | Job listings | Greenhouse ATS API |
 | Search | Algolia |
@@ -46,14 +46,14 @@ npm run dev
 See `.env.example` — all variables are documented inline.
 
 Required before first run:
-- `CONTENTFUL_SPACE_ID`
-- `CONTENTFUL_DELIVERY_TOKEN`
-- `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY` + `S3_INVESTOR_BUCKET`
+- `Payload CMS_SPACE_ID`
+- `Payload CMS_DELIVERY_TOKEN`
+- `R2_ACCESS_KEY_ID` + `R2_SECRET_ACCESS_KEY` + `R2_INVESTOR_BUCKET`
 - `ATS_API_KEY`
 
-## Contentful content models
+## Payload CMS content models
 
-Create these content types in Contentful before the first build:
+Create these content types in Payload CMS before the first build:
 
 - `solution` — product records
 - `innovationArticle` — R&D editorial
@@ -67,9 +67,9 @@ Field schemas match the type definitions in `src/types/index.ts`.
 
 ## Revalidation
 
-Contentful publishes → webhook to `/api/revalidate` → path-specific ISR.
+Payload CMS publishes → webhook to `/api/revalidate` → path-specific ISR.
 Vercel Cron runs every 6 hours → `/api/revalidate/scheduled` → full refresh.
-Configure the webhook secret in both Contentful and `CONTENTFUL_WEBHOOK_SECRET`.
+Configure the webhook secret in both Payload CMS and `Payload CMS_WEBHOOK_SECRET`.
 
 ## Deployment
 

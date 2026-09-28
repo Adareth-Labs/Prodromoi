@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { Badge, SectionHeader, FieldLabel, TextInput, SelectInput, TextArea, PrimaryButton, SecondaryButton, Spinner } from '@/components/ui';
 import { colors } from '@/styles/tokens';
+import { apiFetch } from '@/lib/api';
 import type { PortalUser } from '@/types';
 const C = colors;
 const STEPS = ['Non-Conformance ID', 'Root Cause Analysis', 'Action Plan'];
@@ -20,8 +21,16 @@ export default function CARDetailClient({ user, car: initialCar }: { user: Porta
   const save = async () => {
     setSaving(true);
     try {
-      await fetch(`/api/car/${car.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ why1: form.why1, rootCause: form.rc, correctiveActions: form.d6, preventiveActions: form.d7, currentStep: step, status: step === 3 ? 'PENDING_REVIEW' : 'IN_PROGRESS' }) });
+      const event = step === 1 ? 'IDENTIFY_ROOT_CAUSE' : step === 2 ? 'SUBMIT_ACTION_PLAN' : 'REQUEST_VERIFICATION';
+      const json = await apiFetch<any>(`/v1/quality/${car.id}/transition`, {
+        method: 'POST',
+        body: JSON.stringify({
+          event, why1: form.why1, rootCause: form.rc, correctiveAction: form.d6,
+          preventiveAction: form.d7, currentStep: step,
+        }),
+      });
+      if (!json.data) throw new Error('API did not return updated CAR');
+      setCar((c: any) => ({ ...c, ...json.data }));
       if (step === 3) router.push('/car');
       else setStep((s: number) => s + 1);
     } finally { setSaving(false); }

@@ -12,12 +12,12 @@ const schema = z.object({
   SUPABASE_ANON_KEY:         z.string().min(1),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
 
-  // ── Cloudflare R2 (S3-compatible) ─────────────────────────────────────────
-  S3_ENDPOINT:           z.string().url(),  // https://<ACCOUNT_ID>.r2.cloudflarestorage.com
-  AWS_ACCESS_KEY_ID:     z.string().min(1),
-  AWS_SECRET_ACCESS_KEY: z.string().min(1),
-  S3_DOCUMENTS_BUCKET:   z.string().min(1),
-  S3_PRESIGN_EXPIRY:     z.coerce.number().default(3600),
+  // ── Cloudflare R2 ─────────────────────────────────────────
+  R2_ENDPOINT:           z.string().url(),  // https://<ACCOUNT_ID>.r2.cloudflarestorage.com
+  R2_ACCESS_KEY_ID:     z.string().min(1),
+  R2_SECRET_ACCESS_KEY: z.string().min(1),
+  R2_DOCUMENTS_BUCKET:   z.string().min(1),
+  R2_PRESIGN_EXPIRY:     z.coerce.number().default(3600),
 
   // ── SMTP2Go (transactional email) ──────────────────────────────────────────
   // Free tier: 1,000 emails/month — smtp2go.com
@@ -29,8 +29,6 @@ const schema = z.object({
   SMTP_FROM:      z.string().email(),
   SMTP_FROM_NAME: z.string().default('PrecisionCore Automotive'),
 
-  // ── Public Site ────────────────────────────────────────────────────────────
-  PUBLIC_SITE_API_SECRET: z.string().min(1),
 
   // ── CORS & Rate limiting ───────────────────────────────────────────────────
   ALLOWED_ORIGINS:      z.string().default('http://localhost:3000'),

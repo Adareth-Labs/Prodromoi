@@ -2,18 +2,18 @@ import { S3Client, ListObjectsV2Command, GetObjectCommand } from '@aws-sdk/clien
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import type { InvestorDocument, FilingType } from '@/types'
 
-// Cloudflare R2 — S3-compatible, region must be 'auto', endpoint required
-const s3 = new S3Client({
+// Cloudflare R2, region must be 'auto', endpoint required
+const r2 = new S3Client({
   region:   'auto',
-  endpoint: process.env.S3_ENDPOINT ?? '',   // https://<ACCOUNT_ID>.r2.cloudflarestorage.com
+  endpoint: process.env.R2_ENDPOINT ?? '',   // https://<ACCOUNT_ID>.r2.cloudflarestorage.com
   credentials: {
-    accessKeyId:     process.env.AWS_ACCESS_KEY_ID ?? '',
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? '',
+    accessKeyId:     process.env.R2_ACCESS_KEY_ID ?? '',
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY ?? '',
   },
 })
 
-const BUCKET = process.env.S3_INVESTOR_BUCKET ?? 'precisioncore-investor-documents'
-const EXPIRY  = parseInt(process.env.S3_PRESIGN_EXPIRY ?? '3600', 10)
+const BUCKET = process.env.R2_INVESTOR_BUCKET ?? 'precisioncore-investor-documents'
+const EXPIRY  = parseInt(process.env.R2_PRESIGN_EXPIRY ?? '3600', 10)
 
 // Key convention: {filingType}/{year}/{filename}
 // e.g.  annual-report/2024/precisioncore-annual-report-2023.pdf
@@ -37,7 +37,7 @@ function parseDocumentKey(key: string): Omit<InvestorDocument, 'presignedUrl' | 
 }
 
 export async function getInvestorDocuments(): Promise<InvestorDocument[]> {
-  const response = await s3.send(
+  const response = await r2.send(
     new ListObjectsV2Command({ Bucket: BUCKET, MaxKeys: 200 })
   )
 
@@ -49,7 +49,7 @@ export async function getInvestorDocuments(): Promise<InvestorDocument[]> {
       .map(async (obj) => {
         const key    = obj.Key!
         const parsed = parseDocumentKey(key)
-        const url    = await getSignedUrl(s3, new GetObjectCommand({ Bucket: BUCKET, Key: key }), { expiresIn: EXPIRY })
+        const url    = await getSignedUrl(r2, new GetObjectCommand({ Bucket: BUCKET, Key: key }), { expiresIn: EXPIRY })
         return {
           ...parsed,
           filedAt:       obj.LastModified?.toISOString() ?? parsed.filedAt,
@@ -64,5 +64,5 @@ export async function getInvestorDocuments(): Promise<InvestorDocument[]> {
 }
 
 export async function getPresignedDownloadUrl(key: string): Promise<string> {
-  return getSignedUrl(s3, new GetObjectCommand({ Bucket: BUCKET, Key: key }), { expiresIn: EXPIRY })
+  return getSignedUrl(r2, new GetObjectCommand({ Bucket: BUCKET, Key: key }), { expiresIn: EXPIRY })
 }

@@ -24,16 +24,24 @@ export interface TransitionRFQInput {
 }
 
 export interface CreateRFQInput {
-  supplierId:     string
-  productSlug?:   string
-  partFamily:     string
-  sku?:           string
-  annualVolume?:  number
-  minLotSize?:    number
-  peakWeekly?:    number
-  sopTargetDate?: string
-  protoDate?:     string
-  createdBy:      string
+  supplierId:      string
+  productSlug?:    string
+  partFamily:      string
+  sku?:            string
+  partNumber?:     string
+  partName?:       string
+  targetPrice?:    number
+  material?:       string
+  toleranceClass?: string
+  drawingRef?:     string
+  requiredBy?:     string
+  notes?:          string
+  annualVolume?:   number
+  minLotSize?:     number
+  peakWeekly?:     number
+  sopTargetDate?:  string
+  protoDate?:      string
+  createdBy:       string
 }
 
 class RFQService {
@@ -43,9 +51,17 @@ class RFQService {
         trackingId:     generateTrackingId(),
         supplierId:     input.supplierId,
         productSlug:    input.productSlug,
-        partFamily:     input.partFamily,
-        sku:            input.sku,
-        annualVolume:   input.annualVolume,
+        partFamily:      input.partFamily,
+        sku:             input.sku ?? input.partNumber,
+        partNumber:      input.partNumber,
+        partName:        input.partName ?? input.partFamily,
+        targetPrice:     input.targetPrice,
+        material:        input.material,
+        toleranceClass:  input.toleranceClass,
+        drawingRef:      input.drawingRef,
+        requiredBy:      input.requiredBy ? new Date(input.requiredBy) : undefined,
+        notes:           input.notes,
+        annualVolume:    input.annualVolume,
         minLotSize:     input.minLotSize,
         peakWeekly:     input.peakWeekly,
         sopTargetDate:  input.sopTargetDate  ? new Date(input.sopTargetDate)  : undefined,
@@ -180,7 +196,7 @@ class RFQService {
   async listForSupplier(supplierId: string, status?: RFQStatus) {
     return db.rFQ.findMany({
       where:   { supplierId, ...(status ? { status } : {}) },
-      include: { documents: { select: { id: true, fileName: true, uploadedAt: true } } },
+      include: { documents: true },
       orderBy: { createdAt: 'desc' },
     })
   }

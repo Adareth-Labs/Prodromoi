@@ -1,12 +1,12 @@
 import type { GlobalConfig } from 'payload'
 
-// Contentful's `siteMetrics` content type had no Payload equivalent at all.
+// The siteMetrics model content type had no Payload equivalent at all.
 // Modeled as a Global (one singleton document) rather than a Collection,
 // since this is exactly the aggregate data the homepage currently hardcodes
 // (revenue, facility count, headcount, etc.) — there's only ever one
 // "current" set of site-wide numbers, not a list of many.
 //
-// Note: Contentful's `lastUpdated` field needs no equivalent here — Payload
+// Note: The previous lastUpdated field field needs no equivalent here — Payload
 // globals already carry an automatic `updatedAt` timestamp on every save.
 export const SiteMetrics: GlobalConfig = {
   slug: 'site-metrics',

@@ -14,6 +14,7 @@ import ppapRouter      from '@/routes/ppap'
 import qualityRouter   from '@/routes/quality'
 import suppliersRouter from '@/routes/suppliers'
 import documentsRouter from '@/routes/documents'
+import publicRouter    from '@/routes/public'
 
 export function createApp() {
   const app = express()
@@ -60,6 +61,7 @@ export function createApp() {
 
   // ── Routes ────────────────────────────────────────────────────────────────
   app.use('/',             healthRouter)
+  app.use('/v1/public',   publicRouter)
   app.use('/v1/rfq',       rfqRouter)
   app.use('/v1/ppap',      ppapRouter)
   app.use('/v1/quality',   qualityRouter)

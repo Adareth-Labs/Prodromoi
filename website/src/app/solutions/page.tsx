@@ -1,7 +1,7 @@
 import { Suspense } from 'react'
 import { DomainFilter } from '@/components/solutions/DomainFilter'
 import { ProductCard } from '@/components/solutions/ProductCard'
-import { getSolutions } from '@/lib/contentful/queries'
+import { getSolutions } from '@/lib/payload/api'
 import type { Metadata } from 'next'
 import type { TechnologyDomain } from '@/types'
 

@@ -15,8 +15,16 @@ const router = Router()
 
 const createSchema = z.object({
   productSlug:    z.string().optional(),
-  partFamily:     z.string().min(1),
+  partFamily:     z.string().min(1).optional(),
+  partNumber:     z.string().min(1).optional(),
+  partName:       z.string().min(1).optional(),
   sku:            z.string().optional(),
+  targetPrice:    z.number().nonnegative().optional(),
+  material:       z.string().optional(),
+  toleranceClass: z.string().optional(),
+  drawingRef:     z.string().optional(),
+  requiredBy:     z.string().datetime().optional(),
+  notes:          z.string().max(5000).optional(),
   annualVolume:   z.number().positive().optional(),
   minLotSize:     z.number().positive().optional(),
   peakWeekly:     z.number().positive().optional(),
@@ -47,8 +55,18 @@ router.get('/', authenticate, requirePermission('rfq:read'), asyncHandler(async 
 
 // POST /rfq — create new RFQ
 router.post('/', authenticate, requirePermission('rfq:create'), rfqLimiter, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const body   = createSchema.parse(req.body)
-  const rfq    = await rfqService.create({ ...body, supplierId: req.auth.supplierId, createdBy: req.auth.sub })
+  const body = createSchema.parse(req.body)
+  const partFamily = body.partFamily ?? body.partName ?? body.partNumber ?? body.sku
+  if (!partFamily) {
+    res.status(400).json({ success: false, error: 'partName, partNumber, sku, or partFamily is required' })
+    return
+  }
+  const rfq = await rfqService.create({
+    ...body,
+    partFamily,
+    supplierId: req.auth.supplierId,
+    createdBy: req.auth.sub,
+  })
   res.status(201).json({ success: true, data: rfq })
 }))
 
@@ -123,7 +141,7 @@ router.get('/:id/documents/:docId/download', authenticate, requirePermission('rf
 
   // Report the URL's actual configured lifetime instead of a hardcoded
   // number, so this can never drift from what getDownloadUrl really signed.
-  res.json({ success: true, data: { downloadUrl, expiresIn: env.S3_PRESIGN_EXPIRY } })
+  res.json({ success: true, data: { downloadUrl, expiresIn: env.R2_PRESIGN_EXPIRY } })
 }))
 
 export default router

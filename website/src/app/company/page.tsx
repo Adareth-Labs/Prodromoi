@@ -1,4 +1,4 @@
-import { getLeadership, getFacilities } from '@/lib/contentful/queries'
+import { getLeadership, getFacilities } from '@/lib/payload/api'
 import type { Metadata } from 'next'
 
 export const revalidate = parseInt(process.env.REVALIDATE_COMPANY ?? '86400', 10)

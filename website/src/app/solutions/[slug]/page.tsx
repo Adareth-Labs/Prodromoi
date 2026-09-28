@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import { Badge } from '@/components/ui/Badge'
-import { getSolutionBySlug, getAllSolutionSlugs } from '@/lib/contentful/queries'
+import { getSolutionBySlug, getAllSolutionSlugs } from '@/lib/payload/api'
 import type { Metadata } from 'next'
 
 export const revalidate = parseInt(process.env.REVALIDATE_SOLUTIONS ?? '3600', 10)
