@@ -25,6 +25,8 @@ async function getPayload() {
 }
 
 async function queryCollection(args: Parameters<Awaited<ReturnType<typeof getPayload>>['find']>[0]) {
+  // Payload's exact WHERE type, derived from the Local API find() method.
+
   try {
     const payload = await getPayload()
     return await payload.find(args)
@@ -43,6 +45,9 @@ async function queryGlobal(slug: 'site-metrics') {
     throw err
   }
 }
+
+type PayloadFindArgs = Parameters<Awaited<ReturnType<typeof getPayload>>['find']>[0]
+type PayloadWhere = NonNullable<PayloadFindArgs['where']>
 
 const DOMAIN_TO_PAYLOAD: Record<string, string> = {
   powertrain: 'Powertrain',
@@ -239,7 +244,7 @@ export async function getSolutions(options?: {
   limit?: number
   skip?: number
 }): Promise<PaginatedResponse<Solution>> {
-  const where: Record<string, unknown> = { status: { equals: 'published' } }
+  const where: PayloadWhere = { status: { equals: 'published' } }
   if (options?.domain) where.domain = { equals: DOMAIN_TO_PAYLOAD[options.domain] ?? options.domain }
 
   const response = await queryCollection({
@@ -324,7 +329,7 @@ export async function getNewsArticles(options?: {
   limit?: number
   skip?: number
 }): Promise<PaginatedResponse<NewsArticle>> {
-  const where: Record<string, unknown> = { status: { equals: 'published' } }
+  const where: PayloadWhere = { status: { equals: 'published' } }
   if (options?.category) where.topicCategory = { equals: options.category }
   const response = await queryCollection({
     collection: 'news',
@@ -397,3 +402,4 @@ export const getAllArticleSlugs = getAllInnovationSlugs
 export const getNewsItemBySlug = getNewsArticleBySlug
 export const getNewsItems = async (opts?: { type?: string; limit?: number }) =>
   (await getNewsArticles({ limit: opts?.limit })).items
+

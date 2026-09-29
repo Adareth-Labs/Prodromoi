@@ -13,201 +13,317 @@ import { randomBytes } from 'crypto'
 const router = Router()
 
 const createSchema = z.object({
-  severity:            z.enum(['MINOR','MAJOR','CRITICAL']),
-  deviationDescription:z.string().min(10).optional(),
-  deviation:           z.string().min(10).optional(),
-  partId:              z.string().optional(),
-  nonConformingPart:   z.string().optional(),
+  severity:             z.enum(['MINOR', 'MAJOR', 'CRITICAL']),
+  deviationDescription: z.string().min(10).optional(),
+  deviation:            z.string().min(10).optional(),
+  partId:               z.string().optional(),
+  nonConformingPart:    z.string().optional(),
   affectedQty:         z.number().int().positive().optional(),
-  detectedBy:          z.string().optional(),
-  batchNumber:         z.string().optional(),
-  rfqId:               z.string().uuid().optional(),
-  lotNumber:           z.string().optional(),
-  assignedTo:          z.string().optional(),
+  detectedBy:           z.string().optional(),
+  batchNumber:          z.string().optional(),
+  rfqId:                z.string().uuid().optional(),
+  lotNumber:            z.string().optional(),
+  assignedTo:           z.string().optional(),
 })
 
 const transitionSchema = z.object({
-  event: z.enum(['IDENTIFY_ROOT_CAUSE','SUBMIT_ACTION_PLAN','REQUEST_VERIFICATION','CLOSE','ESCALATE']),
-  rootCause:       z.string().optional(),
-  correctiveAction:z.string().optional(),
-  preventiveAction:z.string().optional(),
-  actionDueDate:   z.string().datetime().optional(),
-  why1:            z.string().optional(),
+  event:            z.enum(['IDENTIFY_ROOT_CAUSE', 'SUBMIT_ACTION_PLAN', 'REQUEST_VERIFICATION', 'CLOSE', 'ESCALATE']),
+  rootCause:        z.string().optional(),
+  correctiveAction: z.string().optional(),
+  preventiveAction: z.string().optional(),
+  actionDueDate:    z.string().datetime().optional(),
+  why1:             z.string().optional(),
   closureNotes:    z.string().optional(),
-  currentStep:     z.number().int().min(1).max(3).optional(),
+  currentStep:      z.number().int().min(1).max(3).optional(),
 })
 
 const EVENT_TO_STATUS: Record<string, CARStatus> = {
-  IDENTIFY_ROOT_CAUSE:   'ROOT_CAUSE_IDENTIFIED',
-  SUBMIT_ACTION_PLAN:    'ACTION_PLAN_SUBMITTED',
-  REQUEST_VERIFICATION:  'VERIFICATION_PENDING',
-  CLOSE:                 'CLOSED',
-  ESCALATE:              'ESCALATED',
+  IDENTIFY_ROOT_CAUSE: 'ROOT_CAUSE_IDENTIFIED',
+  SUBMIT_ACTION_PLAN: 'ACTION_PLAN_SUBMITTED',
+  REQUEST_VERIFICATION: 'VERIFICATION_PENDING',
+  CLOSE: 'CLOSED',
+  ESCALATE: 'ESCALATED',
 }
 
 function generateCARId(): string {
-  const year  = new Date().getFullYear()
+  const year = new Date().getFullYear()
   const token = randomBytes(2).toString('hex').toUpperCase()
+
   return `CAR-${year}-${token}`
 }
 
-router.get('/', authenticate, requirePermission('car:read'), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const cars = await db.cARReport.findMany({
-    where:   { supplierId: req.auth.supplierId },
-    orderBy: { createdAt: 'desc' },
-  })
-  res.json({ success: true, data: cars })
-}))
-
-router.post('/', authenticate, requirePermission('car:create'), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const body = createSchema.parse(req.body)
-  const deviationDescription = body.deviationDescription ?? body.deviation
-  const partId = body.partId ?? body.nonConformingPart
-  if (!deviationDescription || !partId || !body.affectedQty) {
-    res.status(400).json({ success: false, error: 'deviation, nonConformingPart, and affectedQty are required' })
-    return
-  }
-
-  // A referenced RFQ must belong to the caller's own supplier — otherwise
-  // this CAR would silently link two different suppliers' records together.
-  if (body.rfqId) {
-    const rfq = await db.rFQ.findUnique({ where: { id: body.rfqId } })
-    if (!rfq || rfq.supplierId !== req.auth.supplierId) {
-      res.status(400).json({ success: false, error: 'rfqId does not belong to this supplier' })
-      return
-    }
-  }
-
-  // An assignee must be a user within the caller's own supplier organization —
-  // otherwise this would both misassign the CAR and email an unrelated
-  // supplier's user with another supplier's quality data.
-  let assignee: Awaited<ReturnType<typeof db.supplierUser.findUnique>> = null
-  if (body.assignedTo) {
-    assignee = await db.supplierUser.findUnique({ where: { supabaseId: body.assignedTo } })
-    if (!assignee || assignee.supplierId !== req.auth.supplierId) {
-      res.status(400).json({ success: false, error: 'assignedTo does not belong to this supplier' })
-      return
-    }
-  }
-
-  const car = await db.cARReport.create({
-    data: {
-      carId:               generateCARId(),
-      supplierId:          req.auth.supplierId,
-      severity:            body.severity,
-      deviationDescription,
-      partId,
-      affectedQty:         body.affectedQty,
-      detectedBy:          body.detectedBy,
-
-      batchNumber:         body.batchNumber,
-      rfqId:               body.rfqId,
-      lotNumber:           body.lotNumber,
-      assignedTo:          body.assignedTo,
-      createdBy:           req.auth.sub,
-    },
-  })
-
-  if (assignee) {
-    await emailService.sendCARAssignment({
-      carId:        car.carId,
-      severity:     body.severity,
-      toEmail:      assignee.email,
-      assignedName: assignee.name,
-      description:  body.deviationDescription,
+router.get(
+  '/',
+  authenticate,
+  requirePermission('car:read'),
+  asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    const cars = await db.cARReport.findMany({
+      where: { supplierId: req.auth.supplierId },
+      orderBy: { createdAt: 'desc' },
     })
-  }
 
-  await auditService.log({
-    action: 'CREATE', actorId: req.auth.sub, actorEmail: req.auth.email,
-    actorTier: req.auth.tier, resourceType: 'CAR',
-    resourceId: car.id, supplierId: req.auth.supplierId, carId: car.id,
-    afterState: { status: 'OPEN', severity: body.severity },
-  })
+    res.json({ success: true, data: cars })
+  }),
+)
 
-  res.status(201).json({ success: true, data: car })
-}))
+router.post(
+  '/',
+  authenticate,
+  requirePermission('car:create'),
+  asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    const body = createSchema.parse(req.body)
+    const deviationDescription = body.deviationDescription ?? body.deviation
+    const partId = body.partId ?? body.nonConformingPart
+
+    if (!deviationDescription || !partId || !body.affectedQty) {
+      res.status(400).json({
+        success: false,
+        error: 'deviation, nonConformingPart, and affectedQty are required',
+      })
+      return
+    }
+
+    // A referenced RFQ must belong to the caller's own supplier — otherwise
+    // this CAR would silently link two different suppliers' records together.
+    if (body.rfqId) {
+      const rfq = await db.rFQ.findUnique({
+        where: { id: body.rfqId },
+      })
+
+      if (!rfq || rfq.supplierId !== req.auth.supplierId) {
+        res.status(400).json({
+          success: false,
+          error: 'rfqId does not belong to this supplier',
+        })
+        return
+      }
+    }
+
+    // An assignee must be a user within the caller's own supplier organization —
+    // otherwise this would both misassign the CAR and email an unrelated
+    // supplier's user with another supplier's quality data.
+    let assignee: Awaited<ReturnType<typeof db.supplierUser.findUnique>> = null
+
+    if (body.assignedTo) {
+      assignee = await db.supplierUser.findUnique({
+        where: { supabaseId: body.assignedTo },
+      })
+
+      if (!assignee || assignee.supplierId !== req.auth.supplierId) {
+        res.status(400).json({
+          success: false,
+          error: 'assignedTo does not belong to this supplier',
+        })
+        return
+      }
+    }
+
+    const car = await db.cARReport.create({
+      data: {
+        carId: generateCARId(),
+        supplierId: req.auth.supplierId,
+        severity: body.severity,
+        deviationDescription,
+        partId,
+        affectedQty: body.affectedQty,
+        detectedBy: body.detectedBy,
+        batchNumber: body.batchNumber,
+        rfqId: body.rfqId,
+        lotNumber: body.lotNumber,
+        assignedTo: body.assignedTo,
+        createdBy: req.auth.sub,
+      },
+    })
+
+    if (assignee) {
+      await emailService.sendCARAssignment({
+        carId: car.carId,
+        severity: body.severity,
+        toEmail: assignee.email,
+        assignedName: assignee.name,
+        description: deviationDescription,
+      })
+    }
+
+    await auditService.log({
+      action: 'CREATE',
+      actorId: req.auth.sub,
+      actorEmail: req.auth.email,
+      actorTier: req.auth.tier,
+      resourceType: 'CAR',
+      resourceId: car.id,
+      supplierId: req.auth.supplierId,
+      carId: car.id,
+      afterState: {
+        status: 'OPEN',
+        severity: body.severity,
+      },
+    })
+
+    res.status(201).json({
+      success: true,
+      data: car,
+    })
+  }),
+)
 
 // GET /quality/capacity — latest line snapshots plus seven-day history
-router.get('/capacity', authenticate, requirePermission('capacity:read'), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const snapshots = await db.capacitySnapshot.findMany({
-    where: { supplierId: req.auth.supplierId },
-    orderBy: { snapshotAt: 'desc' },
-    distinct: ['lineId'],
-    take: 20,
-  })
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-  const history = await db.capacitySnapshot.findMany({
-    where: { supplierId: req.auth.supplierId, snapshotAt: { gte: sevenDaysAgo } },
-    orderBy: { snapshotAt: 'asc' },
-    select: { snapshotAt: true, oee: true, utilization: true, lineId: true },
-  })
-  const overallOEE = snapshots.length
-    ? snapshots.reduce((sum, s) => sum + Number(s.oee), 0) / snapshots.length
-    : 0
+router.get(
+  '/capacity',
+  authenticate,
+  requirePermission('capacity:read'),
+  asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    const snapshots = await db.capacitySnapshot.findMany({
+      where: { supplierId: req.auth.supplierId },
+      orderBy: { snapshotAt: 'desc' },
+      distinct: ['lineId'],
+      take: 20,
+    })
 
-  res.json({ success: true, data: {
-    vendorId: req.auth.vendorId,
-    snapshotAt: new Date().toISOString(),
-    overallOEE: Math.round(overallOEE * 10) / 10,
-    partsShippedMTD: 142850,
-    monthlyTarget: 200000,
-    lines: snapshots.map(s => ({ lineId: s.lineId, lineName: s.lineName, oee: Number(s.oee), utilization: Number(s.utilization), status: s.status })),
-    weeklyHistory: history.map(h => ({ day: new Date(h.snapshotAt).toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase(), oee: Number(h.oee), utilization: Number(h.utilization) })),
-  }})
-}))
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
 
+    const history = await db.capacitySnapshot.findMany({
+      where: {
+        supplierId: req.auth.supplierId,
+        snapshotAt: { gte: sevenDaysAgo },
+      },
+      orderBy: { snapshotAt: 'asc' },
+      select: {
+        snapshotAt: true,
+        oee: true,
+        utilization: true,
+        lineId: true,
+      },
+    })
 
-router.get('/:id', authenticate, requirePermission('car:read'), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const car = await db.cARReport.findUnique({
-    where:   { id: req.params.id },
-    include: { documents: true },
-  })
-  if (!car || car.supplierId !== req.auth.supplierId) {
-    res.status(404).json({ success: false, error: 'CAR not found' }); return
-  }
-  res.json({ success: true, data: car })
-}))
+    const overallOEE = snapshots.length
+      ? snapshots.reduce((sum, snapshot) => sum + Number(snapshot.oee), 0) / snapshots.length
+      : 0
 
-router.post('/:id/transition', authenticate, requirePermission('car:transition'), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const body   = transitionSchema.parse(req.body)
-  const before = await db.cARReport.findUnique({ where: { id: req.params.id } })
+    res.json({
+      success: true,
+      data: {
+        vendorId: req.auth.vendorId,
+        snapshotAt: new Date().toISOString(),
+        overallOEE: Math.round(overallOEE * 10) / 10,
+        partsShippedMTD: 142850,
+        monthlyTarget: 200000,
+        lines: snapshots.map(snapshot => ({
+          lineId: snapshot.lineId,
+          lineName: snapshot.lineName,
+          oee: Number(snapshot.oee),
+          utilization: Number(snapshot.utilization),
+          status: snapshot.status,
+        })),
+        weeklyHistory: history.map(snapshot => ({
+          day: new Date(snapshot.snapshotAt)
+            .toLocaleDateString('en-US', { weekday: 'short' })
+            .toUpperCase(),
+          oee: Number(snapshot.oee),
+          utilization: Number(snapshot.utilization),
+        })),
+      },
+    })
+  }),
+)
 
-  if (!before || before.supplierId !== req.auth.supplierId) {
-    res.status(404).json({ success: false, error: 'CAR not found' })
-    return
-  }
+router.get(
+  '/:id',
+  authenticate,
+  requirePermission('car:read'),
+  asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    const car = await db.cARReport.findUnique({
+      where: { id: req.params.id },
+      include: { documents: true },
+    })
 
-  const newStatus = EVENT_TO_STATUS[body.event] as CARStatus
+    if (!car || car.supplierId !== req.auth.supplierId) {
+      res.status(404).json({
+        success: false,
+        error: 'CAR not found',
+      })
+      return
+    }
 
-  const car = await db.cARReport.update({
-    where: { id: req.params.id },
-    data:  {
-      status:           newStatus,
-      rootCause:        body.rootCause,
-      correctiveAction: body.correctiveAction,
-      preventiveAction: body.preventiveAction,
-      actionDueDate:    body.actionDueDate ? new Date(body.actionDueDate) : undefined,
-      why1:             body.why1,
-      closureNotes:     body.closureNotes,
-      currentStep:      body.currentStep,
-      verifiedBy:       body.event === 'REQUEST_VERIFICATION' ? req.auth.sub : undefined,
-      verifiedAt:       body.event === 'REQUEST_VERIFICATION' ? new Date() : undefined,
-      closedBy:         body.event === 'CLOSE' ? req.auth.sub : undefined,
-      closedAt:         body.event === 'CLOSE' ? new Date() : undefined,
-    },
-  })
+    res.json({
+      success: true,
+      data: car,
+    })
+  }),
+)
 
-  await auditService.log({
-    action: 'TRANSITION', actorId: req.auth.sub, actorEmail: req.auth.email,
-    actorTier: req.auth.tier, resourceType: 'CAR', resourceId: car.id,
-    supplierId: req.auth.supplierId, carId: car.id,
-    beforeState: { status: before.status }, afterState: { status: newStatus },
-    metadata: { event: body.event },
-  })
+router.post(
+  '/:id/transition',
+  authenticate,
+  requirePermission('car:transition'),
+  asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    const body = transitionSchema.parse(req.body)
 
-  res.json({ success: true, data: car })
-}))
+    const before = await db.cARReport.findUnique({
+      where: { id: req.params.id },
+    })
 
+    if (!before || before.supplierId !== req.auth.supplierId) {
+      res.status(404).json({
+        success: false,
+        error: 'CAR not found',
+      })
+      return
+    }
+
+    const newStatus = EVENT_TO_STATUS[body.event] as CARStatus
+
+    const car = await db.cARReport.update({
+      where: { id: req.params.id },
+      data: {
+        status: newStatus,
+        rootCause: body.rootCause,
+        correctiveAction: body.correctiveAction,
+        preventiveAction: body.preventiveAction,
+        actionDueDate: body.actionDueDate
+          ? new Date(body.actionDueDate)
+          : undefined,
+        why1: body.why1,
+        closureNotes: body.closureNotes,
+        currentStep: body.currentStep,
+        verifiedBy:
+          body.event === 'REQUEST_VERIFICATION'
+            ? req.auth.sub
+            : undefined,
+        verifiedAt:
+          body.event === 'REQUEST_VERIFICATION'
+            ? new Date()
+            : undefined,
+        closedBy:
+          body.event === 'CLOSE'
+            ? req.auth.sub
+            : undefined,
+        closedAt:
+          body.event === 'CLOSE'
+            ? new Date()
+            : undefined,
+      },
+    })
+
+    await auditService.log({
+      action: 'TRANSITION',
+      actorId: req.auth.sub,
+      actorEmail: req.auth.email,
+      actorTier: req.auth.tier,
+      resourceType: 'CAR',
+      resourceId: car.id,
+      supplierId: req.auth.supplierId,
+      carId: car.id,
+      beforeState: { status: before.status },
+      afterState: { status: newStatus },
+      metadata: { event: body.event },
+    })
+
+    res.json({
+      success: true,
+      data: car,
+    })
+  }),
+)
 
 export default router

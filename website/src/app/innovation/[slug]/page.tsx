@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import { Badge } from '@/components/ui/Badge'
 import { getInnovationArticleBySlug, getAllInnovationSlugs } from '@/lib/payload/api'
-import { documentToReactComponents } from '@/components/RichText'
+import { RichText } from '@/components/RichText'
 import type { Metadata } from 'next'
 
 export const revalidate = 3600
@@ -33,7 +33,7 @@ export default async function InnovationArticlePage({ params }: PageProps) {
         <div className="font-mono text-xs text-ink-secondary ml-auto">{new Date(article.publishedAt).toLocaleDateString('en-GB',{year:'numeric',month:'long',day:'numeric'})} · {article.readTimeMinutes} min read</div>
       </div>
       <div className="prose prose-neutral max-w-none text-base text-ink-secondary leading-relaxed">
-        {article.body ? documentToReactComponents(article.body as Parameters<typeof documentToReactComponents>[0]) : <p>{article.summary}</p>}
+        {article.body ? <RichText data={article.body} /> : <p>{article.summary}</p>}
       </div>
     </div>
   )

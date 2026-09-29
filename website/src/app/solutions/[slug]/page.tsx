@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/Badge'
 import { getSolutionBySlug, getAllSolutionSlugs } from '@/lib/payload/api'
 import type { Metadata } from 'next'
 
-export const revalidate = parseInt(process.env.REVALIDATE_SOLUTIONS ?? '3600', 10)
+export const revalidate = 3600
 
 interface PageProps { params: { slug: string } }
 

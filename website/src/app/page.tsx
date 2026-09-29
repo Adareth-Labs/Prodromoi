@@ -4,6 +4,7 @@ import { TechnicalPillars } from '@/components/home/TechnicalPillars'
 import { NewsroomFeed } from '@/components/home/NewsroomFeed'
 import Link from 'next/link'
 import type { Metadata } from 'next'
+import type { NewsArticle } from '@/types'
 
 export const revalidate = 3600
 
@@ -21,30 +22,47 @@ export default async function HomePage() {
     facilityCount: 42,
     headcount: 12500, // Added headcount for .toLocaleString()
     iatfCertifiedCount: 38,
+    countryCount: 12,
+    lastUpdated: '2026-09-01',
   }
 
   // Demonstration newsroom data for the portfolio case study.
-  const newsData = {
+  const newsData: { items: NewsArticle[] } = {
     items: [
       {
-        sys: { id: '1' },
+        sys: { id: '1', createdAt: '2026-06-01T10:00:00Z', updatedAt: '2026-06-01T10:00:00Z' },
         title: 'PrecisionCore Expands',
         publishedAt: '2026-06-01T10:00:00Z',
-        excerpt: 'New state-of-the-art facility opens to support growing EV demands.',
+        category: 'corporate',
+        attribution: 'PrecisionCore',
+        readTimeMinutes: 2,
+        summary: 'New state-of-the-art facility opens to support growing EV demands.',
+        body: null,
+        featuredMaterial: false,
         slug: 'precisioncore-expands',
       },
       {
-        sys: { id: '2' },
+        sys: { id: '2', createdAt: '2026-05-15T10:00:00Z', updatedAt: '2026-05-15T10:00:00Z' },
         title: 'Next-Gen Structural Integrity Tech Announced',
         publishedAt: '2026-05-15T10:00:00Z',
-        excerpt: 'Lighter, stronger chassis components enter mass production.',
+        category: 'technical',
+        attribution: 'PrecisionCore',
+        readTimeMinutes: 3,
+        summary: 'Lighter, stronger chassis components enter mass production.',
+        body: null,
+        featuredMaterial: false,
         slug: 'next-gen-tech',
       },
       {
-        sys: { id: '3' },
+        sys: { id: '3', createdAt: '2026-04-20T10:00:00Z', updatedAt: '2026-04-20T10:00:00Z' },
         title: 'Global Supply Chain Optimization Report',
         publishedAt: '2026-04-20T10:00:00Z',
-        excerpt: 'How we are reducing lead times for our OEM partners worldwide.',
+        category: 'corporate',
+        attribution: 'PrecisionCore',
+        readTimeMinutes: 4,
+        summary: 'How we are reducing lead times for our OEM partners worldwide.',
+        body: null,
+        featuredMaterial: false,
         slug: 'supply-chain-report',
       }
     ]
@@ -113,3 +131,6 @@ export default async function HomePage() {
     </>
   )
 }
+
+
+

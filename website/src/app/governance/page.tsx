@@ -1,6 +1,6 @@
 import { getBoardMembers } from '@/lib/payload/api'
 import type { Metadata } from 'next'
-export const revalidate = parseInt(process.env.REVALIDATE_COMPANY ?? '86400', 10)
+export const revalidate = 86400
 export const metadata: Metadata = { title: 'Corporate Governance', description: 'Board of directors, committee structure, and published governance policies.' }
 export default async function GovernancePage() {
   const board = await getBoardMembers().catch(() => [])

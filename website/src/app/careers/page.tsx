@@ -3,7 +3,7 @@ import { getJobListings } from '@/lib/ats/client'
 import { Badge } from '@/components/ui/Badge'
 import type { Metadata } from 'next'
 
-export const revalidate = parseInt(process.env.REVALIDATE_CAREERS ?? '1800', 10)
+export const revalidate = 1800
 export const metadata: Metadata = {
   title: 'Engineering Careers',
   description: '24 open positions across Engineering, Quality, R&D, and Operations. Roles in Stuttgart, Detroit, Nagoya, Queretaro, and remote.',

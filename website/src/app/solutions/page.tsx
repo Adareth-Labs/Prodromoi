@@ -5,7 +5,7 @@ import { getSolutions } from '@/lib/payload/api'
 import type { Metadata } from 'next'
 import type { TechnologyDomain } from '@/types'
 
-export const revalidate = parseInt(process.env.REVALIDATE_SOLUTIONS ?? '3600', 10)
+export const revalidate = 3600
 
 export const metadata: Metadata = {
   title: 'Solutions Catalog',
