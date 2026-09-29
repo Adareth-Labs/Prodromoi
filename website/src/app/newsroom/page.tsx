@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/Badge'
 import type { Metadata } from 'next'
 import type { NewsCategory } from '@/types'
 
-export const revalidate = parseInt(process.env.REVALIDATE_NEWSROOM ?? '300', 10)
+export const revalidate = 300
 export const metadata: Metadata = {
   title: 'Newsroom',
   description: 'Press releases, technical disclosures, and corporate announcements from PrecisionCore Automotive.',

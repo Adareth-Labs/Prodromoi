@@ -1,11 +1,11 @@
 import { notFound } from 'next/navigation'
 import { Badge } from '@/components/ui/Badge'
 import { getNewsArticleBySlug, getAllNewsSlugs } from '@/lib/payload/api'
-import { documentToReactComponents } from '@/components/RichText'
+import { RichText } from '@/components/RichText'
 import { format } from 'date-fns'
 import type { Metadata } from 'next'
 
-export const revalidate = parseInt(process.env.REVALIDATE_NEWSROOM ?? '300', 10)
+export const revalidate = 300
 interface PageProps { params: { slug: string } }
 
 export async function generateStaticParams() {
@@ -35,8 +35,9 @@ export default async function NewsArticlePage({ params }: PageProps) {
         <span>·</span><span>{article.readTimeMinutes} min read</span>
       </div>
       <div className="text-base text-ink-secondary leading-relaxed">
-        {article.body ? documentToReactComponents(article.body as Parameters<typeof documentToReactComponents>[0]) : <p>{article.summary}</p>}
+        {article.body ? <RichText data={article.body} /> : <p>{article.summary}</p>}
       </div>
     </div>
   )
 }
+

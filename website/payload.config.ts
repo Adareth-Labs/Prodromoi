@@ -21,7 +21,7 @@ export default buildConfig({
     user:         'users',
     meta: {
       titleSuffix: '— PrecisionCore CMS',
-      favicon:     '/favicon.ico',
+      icons:       [{ rel: 'icon', type: 'image/x-icon', url: '/favicon.ico' }],
     },
   },
 
@@ -109,3 +109,4 @@ export default buildConfig({
   secret:   process.env.PAYLOAD_SECRET!,
   serverURL: process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000',
 })
+

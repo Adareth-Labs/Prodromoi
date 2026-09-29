@@ -7,20 +7,14 @@ export interface EntityMeta {
 }
 
 export interface MediaAsset {
-  sys: EntityMeta
-  fields: {
-    title: string
-    description?: string
-    file: {
-      url: string
-      fileName: string
-      contentType: string
-      details: {
-        size: number
-        image?: { width: number; height: number }
-      }
-    }
-  }
+  id: string
+  url: string
+  alt: string
+  filename?: string
+  mimeType?: string
+  width?: number
+  height?: number
+  filesize?: number
 }
 
 // ── SOLUTIONS ──────────────────────────────────────────────────────────────────
@@ -246,3 +240,5 @@ export interface ApiError {
   code: string
   status: number
 }
+
+

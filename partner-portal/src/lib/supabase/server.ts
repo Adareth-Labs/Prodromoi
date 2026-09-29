@@ -1,33 +1,38 @@
-// src/lib/supabase/server.ts
-// Server-side Supabase client — reads/writes cookies for SSR session management.
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import type { CookieOptions } from '@supabase/ssr';
 
-type CookieToSet = { name: string; value: string; options?: CookieOptions };
-
-export async function createClient() {
+export const createClient = async () => {
   const cookieStore = await cookies();
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     {
       cookies: {
-        getAll() {
+        getAll: () => {
           return cookieStore.getAll();
         },
-        setAll(cookiesToSet: CookieToSet[]) {
+
+        setAll: (
+          cookieValues: {
+            name: string;
+            value: string;
+            options: CookieOptions;
+          }[],
+        ) => {
           try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options),
+            cookieValues.forEach(({ name, value, options }) => {
+              cookieStore.set(name, value, options);
+            });
+          } catch (error) {
+            console.debug(
+              '[supabase/server] Cookie update skipped',
+              error,
             );
-          } catch {
-            // setAll is called from Server Components where cookies can't be set.
-            // The middleware handles refreshing the session cookie instead.
           }
         },
       },
     },
   );
-}
+};
