@@ -19,6 +19,10 @@ import publicRouter    from '@/routes/public'
 export function createApp() {
   const app = express()
 
+  // Trust only explicitly configured proxy hops before rate-limiters or logs
+  // inspect req.ip. Keep 0 unless the deployment topology is known.
+  app.set('trust proxy', env.TRUST_PROXY_HOPS)
+
   // ── Security headers ─────────────────────────────────────────────────────
   app.use(helmet({
     contentSecurityPolicy: {
@@ -32,8 +36,15 @@ export function createApp() {
   }))
 
   // ── Prometheus scrape endpoint — must be BEFORE auth ─────────────────────
-  // Block at Cloudflare/proxy so only internal Prometheus can reach this.
-  app.get('/metrics', metricsEndpoint)
+  // Keep the scrape endpoint private. Production deployments must configure a strong
+  // token; local development can scrape localhost without one.
+  app.get('/metrics', (req, res) => {
+    if (env.NODE_ENV === 'production' && !env.METRICS_BEARER_TOKEN) return res.sendStatus(404)
+    if (env.METRICS_BEARER_TOKEN && req.get('authorization') !== `Bearer ${env.METRICS_BEARER_TOKEN}`) {
+      return res.sendStatus(401)
+    }
+    return metricsEndpoint(req, res)
+  })
 
   // ── CORS ──────────────────────────────────────────────────────────────────
   const allowedOrigins = env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
@@ -55,9 +66,6 @@ export function createApp() {
 
   // ── Rate limiting ─────────────────────────────────────────────────────────
   app.use(globalLimiter)
-
-  // Trust proxy for correct IP behind load balancer / Cloudflare
-  app.set('trust proxy', 1)
 
   // ── Routes ────────────────────────────────────────────────────────────────
   app.use('/',             healthRouter)

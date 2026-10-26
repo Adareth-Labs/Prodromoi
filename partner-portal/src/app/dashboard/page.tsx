@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { automotiveImage } from '@/lib/automotive-image';
+import Image from 'next/image';
 import { requirePortalUser } from '@/lib/auth';
 import { apiFetchServer } from '@/lib/api-server';
 import {
@@ -84,6 +86,42 @@ export default async function DashboardPage() {
         eyebrow={`Welcome back, ${firstName}`}
         title="Partner Dashboard"
       />
+
+      <section
+        aria-label="Automotive engineering overview"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))',
+          marginBottom: 22,
+          background: COLORS.surfaceCard,
+          border: `1px solid ${COLORS.borderLight}`,
+          overflow: 'hidden',
+        }}
+      >
+        <div style={{ padding: 'clamp(20px, 3vw, 30px)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <div style={{ fontSize: 9, fontFamily: "'JetBrains Mono', monospace", letterSpacing: '0.14em', textTransform: 'uppercase', color: COLORS.textFaint, marginBottom: 10 }}>
+            Manufacturing intelligence
+          </div>
+          <h2 style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.15, color: COLORS.textDark, marginBottom: 10, fontFamily: "'Hanken Grotesk', sans-serif" }}>
+            Built for high-precision supply chains
+          </h2>
+          <p style={{ color: COLORS.textMuted, fontSize: 13, lineHeight: 1.7, maxWidth: 480 }}>
+            Keep sourcing activity, quality actions and programme deliverables connected in one workspace — from component readiness through production support.
+          </p>
+        </div>
+        <div style={{ position: 'relative', minHeight: 190, background: COLORS.surfaceLow }}>
+          <Image
+            src={automotiveImage('battery-pack-exploded-view.webp')}
+            alt="Exploded technical view of an electric vehicle battery pack and its components"
+            fill
+            sizes="(max-width: 700px) 100vw, 40vw"
+            style={{ objectFit: 'cover' }}
+          />
+          <div style={{ position: 'absolute', right: 12, bottom: 12, padding: '7px 10px', background: 'rgba(0, 2, 10, 0.78)', color: '#f0f4ff', fontSize: 9, fontFamily: "'JetBrains Mono', monospace", letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+            Engineering systems
+          </div>
+        </div>
+      </section>
 
       <div
         style={{

@@ -59,28 +59,51 @@ export default buildConfig({
     pool: { connectionString: process.env.DATABASE_URL! },
   }),
 
-  // ── File storage — Cloudflare R2 ────────────────────────────────────────────
+  // ── File storage — Supabase Storage via its S3-compatible endpoint ─────────
   plugins: [
     s3Storage({
       collections: {
         media: {
           prefix: 'cms-media',
           generateFileURL: ({ filename, prefix }) =>
-            // Serve via R2 public bucket URL or a custom domain
-            `${process.env.R2_PUBLIC_URL}/${prefix}/${filename}`,
+            `${process.env.SUPABASE_STORAGE_PUBLIC_URL}/${process.env.SUPABASE_STORAGE_CMS_BUCKET ?? 'site-media'}/${prefix}/${filename}`,
         },
       },
-      bucket:   process.env.R2_CMS_BUCKET!,
+      bucket: process.env.SUPABASE_STORAGE_CMS_BUCKET ?? 'site-media',
       config: {
-        region:      'auto',
-        endpoint:    process.env.R2_ENDPOINT!,
+        region: process.env.SUPABASE_STORAGE_S3_REGION!,
+        endpoint: process.env.SUPABASE_STORAGE_S3_ENDPOINT!,
+        forcePathStyle: true,
         credentials: {
-          accessKeyId:     process.env.R2_ACCESS_KEY_ID!,
-          secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
+          accessKeyId: process.env.SUPABASE_STORAGE_S3_ACCESS_KEY_ID!,
+          secretAccessKey: process.env.SUPABASE_STORAGE_S3_SECRET_ACCESS_KEY!,
         },
       },
     }),
   ],
+
+  /*
+   * LEGACY CLOUDFLARE R2 PAYLOAD STORAGE CONFIG — intentionally commented out.
+   * It is not active; the S3-compatible adapter above connects to Supabase Storage.
+   *
+   * s3Storage({
+   *   collections: {
+   *     media: {
+   *       prefix: 'cms-media',
+   *       generateFileURL: ({ filename, prefix }) => `${process.env.R2_PUBLIC_URL}/${prefix}/${filename}`,
+   *     },
+   *   },
+   *   bucket: process.env.R2_CMS_BUCKET!,
+   *   config: {
+   *     region: 'auto',
+   *     endpoint: process.env.R2_ENDPOINT!,
+   *     credentials: {
+   *       accessKeyId: process.env.R2_ACCESS_KEY_ID!,
+   *       secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
+   *     },
+   *   },
+   * })
+   */
 
   // ── Email — SMTP2Go ─────────────────────────────────────────────────────────
   email: nodemailerAdapter({
@@ -107,6 +130,6 @@ export default buildConfig({
   graphQL: { disable: true },
 
   secret:   process.env.PAYLOAD_SECRET!,
-  serverURL: process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000',
+  serverURL: process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3001',
 })
 

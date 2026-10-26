@@ -1,6 +1,6 @@
 # PrecisionCore Automotive — Public Site
 
-Next.js 14 public marketing site. App Router, TypeScript, Tailwind CSS.
+Next.js 16 public marketing site. App Router, TypeScript, Tailwind CSS.
 
 ## Stack
 
@@ -9,7 +9,7 @@ Next.js 14 public marketing site. App Router, TypeScript, Tailwind CSS.
 | Framework | Next.js 14 (App Router) |
 | Styling | Tailwind CSS — Achromatic Industrial design system |
 | CMS | Payload CMS (delivery + preview + webhooks) |
-| Investor docs | AWS S3 + pre-signed URLs |
+| Investor docs | Supabase Storage via S3-compatible signed URLs |
 | Job listings | Greenhouse ATS API |
 | Search | Algolia |
 | Deployment | Vercel |
@@ -46,14 +46,15 @@ npm run dev
 See `.env.example` — all variables are documented inline.
 
 Required before first run:
-- `Payload CMS_SPACE_ID`
-- `Payload CMS_DELIVERY_TOKEN`
-- `R2_ACCESS_KEY_ID` + `R2_SECRET_ACCESS_KEY` + `R2_INVESTOR_BUCKET`
-- `ATS_API_KEY`
+- `DATABASE_URL` (PostgreSQL connection string with the `payload` schema)
+- `PAYLOAD_SECRET`
+- Supabase Storage S3 endpoint, region, access key, secret key, public URL and the configured bucket names (see `.env.example`)
+- `SMTP_USER`, `SMTP_PASS` and `SMTP_FROM` when CMS email is enabled
+- `ATS_API_KEY` only when the live careers integration is enabled
 
 ## Payload CMS content models
 
-Create these content types in Payload CMS before the first build:
+The collections below are defined in code. Create or migrate the Payload database before using them:
 
 - `solution` — product records
 - `innovationArticle` — R&D editorial
@@ -88,3 +89,5 @@ Regions: `lhr1` (London) + `iad1` (Virginia). Configure additional regions in `v
 The authenticated partner portal is a **separate application** at `portal.precisioncore.com`.
 The public site links to it but does not share code or infrastructure.
 Set `NEXT_PUBLIC_PORTAL_URL` to the portal deployment URL.
+
+<!-- Legacy R2 note retained for rollback reference only: the previous setup used R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY and R2_INVESTOR_BUCKET. These are not active requirements. -->

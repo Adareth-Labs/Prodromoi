@@ -1,6 +1,7 @@
 import type { CollectionConfig } from 'payload'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
 
+import { triggerContentRevalidation } from '../lib/revalidate-content'
 export const Articles: CollectionConfig = {
   slug: 'articles',
   labels: { singular: 'Innovation article', plural: 'Innovation articles' },
@@ -142,14 +143,9 @@ export const Articles: CollectionConfig = {
   hooks: {
     afterChange: [
       async ({ doc }) => {
-        if (process.env.NEXT_PUBLIC_SITE_URL && process.env.REVALIDATION_SECRET) {
-          await fetch(
-            `${process.env.NEXT_PUBLIC_SITE_URL}/api/revalidate?secret=${process.env.REVALIDATION_SECRET}&tag=innovation`,
-            { method: 'POST' }
-          ).catch(console.error)
-        }
+        await triggerContentRevalidation('innovationArticle', doc.slug)
         return doc
-      },
+      }
     ],
   },
 }

@@ -106,6 +106,7 @@ export interface CARDTO {
   correctiveAction?: string;
   preventiveAction?: string;
   closureNotes?: string;
+  reviewerNotes?: string;
   severity: CARSeverity;
   status: string;
   currentStep?: number;
@@ -115,6 +116,7 @@ export interface CARDTO {
 
 export interface PPAPDocumentDTO {
   id: string;
+  ppapId?: string;
   vendorId?: string;
   supplierId?: string;
   fileName: string;
@@ -214,8 +216,10 @@ export const toPortalCAR = (
     correctiveActions: car.correctiveAction,
     preventiveActions: car.preventiveAction,
     closureNotes: car.closureNotes,
+    reviewerNotes: car.reviewerNotes,
     severity: car.severity,
     status: CAR_STATUS_TO_PORTAL[car.status] ?? 'OPEN',
+    workflowStatus: car.status,
     currentStep: car.currentStep ?? 1,
     openedAt: new Date(car.createdAt).toISOString(),
     closedAt: car.closedAt
@@ -235,6 +239,7 @@ export const toPortalPPAPDocument = (
 
   return {
     id: doc.id,
+    ppapId: doc.ppapId,
     vendorId:
       doc.ppap?.supplierId ??
       doc.supplierId ??

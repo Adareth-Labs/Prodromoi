@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from 'express'
+import { randomUUID } from 'crypto'
 import { ZodError } from 'zod'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { logger } from '@/config/logger'
@@ -18,8 +19,8 @@ export function errorHandler(
   if (err instanceof ZodError) {
     res.status(400).json({
       success: false,
-      error:   'Validation failed',
-      issues:  err.errors.map(e => ({ path: e.path.join('.'), message: e.message })),
+      error: 'Validation failed',
+      issues: err.errors.map(e => ({ path: e.path.join('.'), message: e.message })),
     })
     return
   }
@@ -35,9 +36,21 @@ export function errorHandler(
     }
   }
 
-  const message = err instanceof Error ? err.message : 'Internal server error'
-  logger.error('Unhandled error', { error: message, path: req.path, method: req.method })
-  res.status(500).json({ success: false, error: message })
+  // Only accept a conservative request-ID character set; otherwise generate our own.
+  // Never return database, SMTP, storage, or stack details to clients.
+  const suppliedRequestId = req.get('x-request-id')
+  const requestId = suppliedRequestId && /^[A-Za-z0-9._-]{1,80}$/.test(suppliedRequestId)
+    ? suppliedRequestId
+    : randomUUID()
+  const error = err instanceof Error ? err : new Error('Unknown error')
+  logger.error('Unhandled error', {
+    requestId,
+    error: error.message,
+    stack: error.stack,
+    path: req.path,
+    method: req.method,
+  })
+  res.status(500).json({ success: false, error: 'Internal server error', requestId })
 }
 
 export function notFoundHandler(req: Request, res: Response): void {

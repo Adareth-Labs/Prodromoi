@@ -1,21 +1,34 @@
 import type { NextConfig } from 'next'
 import { withPayload } from '@payloadcms/next/withPayload'
 
+const supabaseStorageHostname = process.env.NEXT_PUBLIC_SUPABASE_STORAGE_PUBLIC_URL
+  ? new URL(process.env.NEXT_PUBLIC_SUPABASE_STORAGE_PUBLIC_URL).hostname
+  : '*.supabase.co'
+const apiOrigin = (() => {
+  try { return new URL(process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3002').origin }
+  catch { return 'http://localhost:3002' }
+})()
+const allowedDevOrigins = (process.env.NEXT_ALLOWED_DEV_ORIGINS ?? '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean)
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
 
-  allowedDevOrigins: ['192.168.0.116'],
+  // Set NEXT_ALLOWED_DEV_ORIGINS to a comma-separated list only when LAN
+  // development is needed; don't bake a developer's private IP into source.
+  allowedDevOrigins,
 
-  // Image optimisation — updated from legacy CMS data/S3 to Cloudflare R2
+  // Image optimization allows the active Supabase Storage public-object URL.
+  // LEGACY R2 hosts (`*.r2.dev`, `media.precisioncore.com`) are intentionally disabled;
+  // the previous remotePatterns are preserved in this comment for rollback reference.
   images: {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: '*.r2.dev',           // R2 public bucket default domain
-      },
-      {
-        protocol: 'https',
-        hostname: 'media.precisioncore.com', // custom R2 domain (set up in R2 dashboard)
+        hostname: supabaseStorageHostname,
+        pathname: '/storage/v1/object/public/**',
       },
     ],
     formats: ['image/avif', 'image/webp'],
@@ -39,8 +52,8 @@ const nextConfig: NextConfig = {
               "script-src 'self' 'unsafe-inline' 'unsafe-eval' *.googletagmanager.com",
               "style-src 'self' 'unsafe-inline' fonts.googleapis.com",
               "font-src 'self' fonts.gstatic.com",
-              "img-src 'self' data: *.r2.dev media.precisioncore.com",
-              "connect-src 'self'",
+              "img-src 'self' data: *.supabase.co",
+              "connect-src 'self' " + apiOrigin + " https://*.supabase.co https://*.storage.supabase.co",
               "frame-ancestors 'none'",
             ].join('; '),
           },

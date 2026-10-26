@@ -1,4 +1,6 @@
 import { getLeadership, getFacilities } from '@/lib/payload/api'
+import { automotiveImage } from '@/lib/automotive-image'
+import Image from 'next/image'
 import type { Metadata } from 'next'
 
 export const revalidate = 86400
@@ -9,6 +11,11 @@ export const metadata: Metadata = {
 export default async function CompanyPage() {
   const [leadership, facilities] = await Promise.all([getLeadership(), getFacilities()])
   const manufacturing = facilities.filter(f => f.facilityType === 'manufacturing')
+  const leadershipPortraits = [
+    automotiveImage('leader-portrait-04.webp'),
+    automotiveImage('leader-portrait-01.webp'),
+    automotiveImage('leader-portrait-02.webp'),
+  ]
 
   return (
     <div className="max-w-platform mx-auto px-12 py-12">
@@ -18,16 +25,23 @@ export default async function CompanyPage() {
       </div>
 
       <section className="mb-16" aria-labelledby="leadership-h">
-        <h2 id="leadership-h" className="text-xl font-medium border-b border-stroke pb-3 mb-8">Executive Leadership</h2>
-        <div className="grid grid-cols-3 gap-6">
+        <h2 id="leadership-h" className="text-xl font-medium border-b border-stroke pb-3 mb-3">Executive Leadership</h2>
+        <p className="text-xs text-ink-secondary mb-8">Illustrative portrait imagery for this demonstration site.</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {(leadership.length ? leadership : [
             { sys:{id:'1',createdAt:'',updatedAt:''}, name:'Dr. Amara Osei',    title:'Chief Executive Officer',  bio:'20+ years in automotive manufacturing. Previously VP Engineering at Continental AG. PhD Mechanical Engineering, TU Munich.', sortOrder:1 },
             { sys:{id:'2',createdAt:'',updatedAt:''}, name:'Marcus Chen',       title:'Chief Technology Officer', bio:'Led electrification programmes at Bosch Mobility. Holds 23 patents in power electronics and E/E architecture. MSc Electrical Engineering, MIT.', sortOrder:2 },
             { sys:{id:'3',createdAt:'',updatedAt:''}, name:'Ingrid Svensson',   title:'Chief Financial Officer',  bio:'Former CFO at Veoneer. CFA charterholder. Specialist in automotive capital markets and M&A. MBA, Stockholm School of Economics.', sortOrder:3 },
-          ]).map((person) => (
-            <div key={person.sys.id} className="card p-6">
-              <div className="w-14 h-14 bg-surface-mid flex items-center justify-center mb-4">
-                <span className="material-symbols-outlined text-2xl text-ink-secondary" aria-hidden="true">person</span>
+          ]).map((person, index) => (
+            <div key={person.sys.id} className="card p-5">
+              <div className="relative h-48 w-full overflow-hidden bg-surface-low mb-5">
+                <Image
+                  src={leadershipPortraits[index % leadershipPortraits.length]}
+                  alt={`Illustrative portrait for ${person.name}`}
+                  fill
+                  sizes="(max-width: 768px) 100vw, 33vw"
+                  className="object-cover object-center"
+                />
               </div>
               <h3 className="text-base font-medium mb-1">{person.name}</h3>
               <div className="font-mono text-xs text-ink-secondary uppercase tracking-widest mb-3">{person.title}</div>
@@ -37,14 +51,42 @@ export default async function CompanyPage() {
         </div>
       </section>
 
+      <section className="mb-16" aria-labelledby="people-h">
+        <div className="border-b border-stroke pb-3 mb-7">
+          <span className="section-label">People & operations</span>
+          <h2 id="people-h" className="text-xl font-medium">Teams behind delivery</h2>
+          <p className="text-xs text-ink-secondary mt-2">Representative imagery highlighting the engineering, programme and supplier teams across the ecosystem.</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+          {[
+            { src: automotiveImage('leader-portrait-03.webp'), alt: 'Illustrative portrait representing programme leadership', title: 'Programme leadership' },
+            { src: automotiveImage('engineering-executive.webp'), alt: 'Illustrative portrait representing customer and programme coordination', title: 'Partner coordination' },
+            { src: automotiveImage('engineering-lead.webp'), alt: 'Illustrative portrait representing manufacturing engineering', title: 'Manufacturing engineering' },
+          ].map((item) => (
+            <article key={item.title} className="card overflow-hidden">
+              <div className="relative aspect-[4/3] bg-surface-low">
+                <Image src={item.src} alt={item.alt} fill sizes="(max-width: 768px) 100vw, 33vw" className="object-cover object-center" />
+              </div>
+              <h3 className="p-4 text-sm font-medium">{item.title}</h3>
+            </article>
+          ))}
+        </div>
+      </section>
+
       <section aria-labelledby="footprint-h">
         <h2 id="footprint-h" className="text-xl font-medium border-b border-stroke pb-3 mb-8">Global Manufacturing Footprint</h2>
         <div className="grid grid-cols-2 gap-8">
-          <div className="bg-surface-low border border-stroke min-h-72 flex items-center justify-center" role="img" aria-label="Global facilities map — 42 facilities across 24 countries">
-            <div className="text-center text-ink-secondary">
-              <span className="material-symbols-outlined text-5xl block mb-2 opacity-40" aria-hidden="true">map</span>
-              <div className="font-mono text-xs uppercase tracking-widest">Interactive Facility Map</div>
-              <div className="text-sm mt-1">42 facilities · 24 countries</div>
+          <div className="relative min-h-72 aspect-[4/3] overflow-hidden border border-stroke bg-surface-low">
+            <Image
+              src={automotiveImage('precision-assembly-facility.webp')}
+              alt="Automotive precision assembly floor with manufacturing workstations"
+              fill
+              sizes="(max-width: 768px) 100vw, 50vw"
+              className="object-cover"
+            />
+            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-5 text-white">
+              <div className="font-mono text-xs uppercase tracking-widest">Global manufacturing footprint</div>
+              <div className="text-sm mt-1 text-white/85">Representative production facility imagery · 42 facilities</div>
             </div>
           </div>
           <div>

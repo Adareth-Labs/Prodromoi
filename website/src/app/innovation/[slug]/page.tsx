@@ -5,19 +5,21 @@ import { RichText } from '@/components/RichText'
 import type { Metadata } from 'next'
 
 export const revalidate = 3600
-interface PageProps { params: { slug: string } }
+interface PageProps { params: Promise<{ slug: string }> }
 
 export async function generateStaticParams() {
   const slugs = await getAllInnovationSlugs()
   return slugs.map((slug) => ({ slug }))
 }
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const a = await getInnovationArticleBySlug(params.slug)
+  const { slug } = await params
+  const a = await getInnovationArticleBySlug(slug)
   if (!a) return {}
   return { title: a.metaTitle ?? a.title, description: a.metaDescription ?? a.summary }
 }
 export default async function InnovationArticlePage({ params }: PageProps) {
-  const article = await getInnovationArticleBySlug(params.slug)
+  const { slug } = await params
+  const article = await getInnovationArticleBySlug(slug)
   if (!article) notFound()
   return (
     <div className="max-w-prose mx-auto px-12 py-12">

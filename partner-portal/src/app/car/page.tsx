@@ -6,7 +6,7 @@ import type { Metadata } from 'next';
 export const metadata: Metadata = { title: 'CAR Workflow' };
 
 export default async function CARPage() {
-  const user = await requirePortalUser({ minTier: 3 });
+  const user = await requirePortalUser({ minTier: 2 });
   const response = await apiFetchServer<any>('/v1/quality').catch((err) => {
     console.error('[CARPage] API request failed', err);
     return { data: [] };

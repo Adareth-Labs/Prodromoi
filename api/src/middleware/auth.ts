@@ -20,6 +20,23 @@ async function extractAuth(payload: Record<string, unknown>): Promise<Authentica
   const sub = payload['sub'] as string
   const meta = (payload['app_metadata'] ?? {}) as Record<string, unknown>
 
+  // Internal reviewer access is explicitly granted through the server-managed
+  // InternalReviewer table. Never trust a client-editable JWT metadata role.
+  const reviewer = await db.internalReviewer.findUnique({ where: { supabaseId: sub } })
+  if (reviewer) {
+    if (!reviewer.isActive) throw new Error('Internal reviewer access is disabled')
+    return {
+      sub,
+      email: reviewer.email || (payload['email'] as string) || '',
+      name: reviewer.name || (meta['name'] as string) || reviewer.email,
+      tier: 'STRATEGIC', // audit compatibility only; internal actors are blocked from supplier-tier routes.
+      supplierId: '',
+      vendorId: '',
+      actorType: 'INTERNAL',
+      internalRole: reviewer.role,
+    }
+  }
+
   // The database is the source of truth for supplier membership, vendor ID,
   // active status, and tier. Client-editable user_metadata is never used for
   // authorization decisions.
@@ -29,7 +46,7 @@ async function extractAuth(payload: Record<string, unknown>): Promise<Authentica
   })
 
   if (!supplierUser || !supplierUser.supplier || !supplierUser.supplier.isActive) {
-    throw new Error('No active supplier mapping for authenticated user')
+    throw new Error('No active supplier or internal reviewer mapping for authenticated user')
   }
 
   return {
@@ -39,6 +56,7 @@ async function extractAuth(payload: Record<string, unknown>): Promise<Authentica
     tier: normalizeTier(supplierUser.supplier.tier),
     supplierId: supplierUser.supplierId,
     vendorId: supplierUser.supplier.vendorId,
+    actorType: 'SUPPLIER',
   }
 }
 

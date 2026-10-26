@@ -16,7 +16,7 @@ export async function middleware(request: NextRequest) {
   // Build a Supabase client that can read/write the session cookie
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)!,
     {
       cookies: {
         getAll() {
@@ -61,10 +61,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Authenticated but hitting login page → redirect to dashboard
+  // Authenticated sessions return to the root router, which distinguishes
+  // supplier and internal quality-reviewer accounts. Do not force every user
+  // into the supplier dashboard.
   if (user && pathname === '/login') {
     const url = request.nextUrl.clone();
-    url.pathname = '/dashboard';
+    url.pathname = '/';
     return NextResponse.redirect(url);
   }
 

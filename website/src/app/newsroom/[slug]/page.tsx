@@ -6,19 +6,21 @@ import { format } from 'date-fns'
 import type { Metadata } from 'next'
 
 export const revalidate = 300
-interface PageProps { params: { slug: string } }
+interface PageProps { params: Promise<{ slug: string }> }
 
 export async function generateStaticParams() {
   const slugs = await getAllNewsSlugs()
   return slugs.map(slug => ({ slug }))
 }
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const a = await getNewsArticleBySlug(params.slug)
+  const { slug } = await params
+  const a = await getNewsArticleBySlug(slug)
   if (!a) return {}
   return { title: a.metaTitle ?? a.title, description: a.metaDescription ?? a.summary }
 }
 export default async function NewsArticlePage({ params }: PageProps) {
-  const article = await getNewsArticleBySlug(params.slug)
+  const { slug } = await params
+  const article = await getNewsArticleBySlug(slug)
   if (!article) notFound()
   return (
     <div className="max-w-prose mx-auto px-12 py-12">

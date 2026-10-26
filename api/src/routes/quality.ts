@@ -1,14 +1,16 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import { authenticate } from '@/middleware/auth'
-import { requirePermission } from '@/middleware/rbac'
+import { requireInternalQualityReviewer, requirePermission } from '@/middleware/rbac'
 import { asyncHandler } from '@/utils/asyncHandler'
 import { db } from '@/config/database'
 import { emailService } from '@/services/email/EmailService'
 import { auditService } from '@/services/audit/AuditService'
-import type { AuthenticatedRequest, CARStatus } from '@/types'
+import { documentService } from '@/services/document/DocumentService'
+import { CAR_EVENT_TO_STATUS, CAR_REVIEWER_DECISION_TO_STATUS, CAR_TRANSITIONS, SUPPLIER_CAR_TRANSITION_EVENTS, type AuthenticatedRequest, type CARReviewerDecision, type CARTransitionEvent } from '@/types'
 import type { Response } from 'express'
 import { randomBytes } from 'crypto'
+import { downloadLimiter } from '@/middleware/rateLimit'
 
 const router = Router()
 
@@ -23,34 +25,173 @@ const createSchema = z.object({
   batchNumber:          z.string().optional(),
   rfqId:                z.string().uuid().optional(),
   lotNumber:            z.string().optional(),
-  assignedTo:           z.string().optional(),
+  assignedTo:           z.string().uuid().optional(),
 })
 
 const transitionSchema = z.object({
   event:            z.enum(['IDENTIFY_ROOT_CAUSE', 'SUBMIT_ACTION_PLAN', 'REQUEST_VERIFICATION', 'CLOSE', 'ESCALATE']),
-  rootCause:        z.string().optional(),
-  correctiveAction: z.string().optional(),
-  preventiveAction: z.string().optional(),
+  rootCause:        z.string().trim().max(5000).optional(),
+  correctiveAction: z.string().trim().max(5000).optional(),
+  preventiveAction: z.string().trim().max(5000).optional(),
   actionDueDate:    z.string().datetime().optional(),
-  why1:             z.string().optional(),
-  closureNotes:    z.string().optional(),
+  why1:             z.string().trim().max(5000).optional(),
+  closureNotes:    z.string().trim().max(5000).optional(),
   currentStep:      z.number().int().min(1).max(3).optional(),
+}).superRefine((body, ctx) => {
+  if (body.event === 'IDENTIFY_ROOT_CAUSE') {
+    if (!body.why1 || body.why1.length < 10) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['why1'], message: 'Describe the initial observation in at least 10 characters.' })
+    if (!body.rootCause || body.rootCause.length < 10) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['rootCause'], message: 'Enter the verified root cause in at least 10 characters.' })
+  }
+  if ((body.event === 'SUBMIT_ACTION_PLAN' || body.event === 'REQUEST_VERIFICATION') && (!body.correctiveAction || body.correctiveAction.length < 10)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['correctiveAction'], message: 'Describe the corrective action in at least 10 characters.' })
+  }
 })
 
-const EVENT_TO_STATUS: Record<string, CARStatus> = {
-  IDENTIFY_ROOT_CAUSE: 'ROOT_CAUSE_IDENTIFIED',
-  SUBMIT_ACTION_PLAN: 'ACTION_PLAN_SUBMITTED',
-  REQUEST_VERIFICATION: 'VERIFICATION_PENDING',
-  CLOSE: 'CLOSED',
-  ESCALATE: 'ESCALATED',
-}
 
 function generateCARId(): string {
   const year = new Date().getFullYear()
-  const token = randomBytes(2).toString('hex').toUpperCase()
+  const token = randomBytes(8).toString('hex').toUpperCase()
 
   return `CAR-${year}-${token}`
 }
+
+const reviewerDecisionSchema = z.object({
+  decision: z.enum(['APPROVE', 'REQUEST_CHANGES']),
+  notes: z.string().trim().min(10, 'Provide at least 10 characters of reviewer notes.').max(5000),
+})
+
+// ── Internal quality reviewer workflow ──────────────────────────────────────
+// Internal access comes only from the server-managed InternalReviewer table.
+// These routes are registered before the generic /:id route below.
+router.get('/reviewer/me', authenticate, requireInternalQualityReviewer, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  res.json({ success: true, data: {
+    sub: req.auth.sub,
+    email: req.auth.email,
+    name: req.auth.name,
+    role: req.auth.internalRole,
+  } })
+}))
+
+router.get('/reviewer/queue', authenticate, requireInternalQualityReviewer, asyncHandler(async (_req: AuthenticatedRequest, res: Response) => {
+  const cars = await db.cARReport.findMany({
+    where: { status: 'VERIFICATION_PENDING' },
+    include: {
+      supplier: { select: { id: true, vendorId: true, companyName: true, contactEmail: true } },
+      documents: { select: { id: true, fileName: true, sizeBytes: true, uploadedAt: true } },
+    },
+    orderBy: { createdAt: 'asc' },
+    take: 100,
+  })
+  const severityRank: Record<string, number> = { CRITICAL: 0, MAJOR: 1, MINOR: 2 }
+  cars.sort((a, b) => severityRank[a.severity] - severityRank[b.severity] || a.createdAt.getTime() - b.createdAt.getTime())
+  res.json({ success: true, data: cars })
+}))
+
+router.get('/reviewer/cars/:id', authenticate, requireInternalQualityReviewer, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const car = await db.cARReport.findUnique({
+    where: { id: req.params.id },
+    include: {
+      supplier: { select: { id: true, vendorId: true, companyName: true, contactEmail: true } },
+      documents: { select: { id: true, fileName: true, sizeBytes: true, uploadedAt: true } },
+    },
+  })
+  if (!car) { res.status(404).json({ success: false, error: 'CAR not found' }); return }
+  res.json({ success: true, data: car })
+}))
+
+router.get('/reviewer/cars/:id/documents/:documentId/download', authenticate, requireInternalQualityReviewer, downloadLimiter, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const document = await db.cARDocument.findFirst({
+    where: { id: req.params.documentId, carId: req.params.id },
+    include: { car: { select: { id: true, carId: true, supplierId: true } } },
+  })
+  if (!document) { res.status(404).json({ success: false, error: 'CAR document not found' }); return }
+  const downloadUrl = await documentService.getDownloadUrl({ key: document.s3Key })
+  await documentService.auditDownload({
+    key: document.s3Key,
+    actorId: req.auth.sub,
+    actorEmail: req.auth.email,
+    actorTier: req.auth.tier,
+    supplierId: document.car.supplierId,
+    ipAddress: req.ip ?? '',
+  })
+  res.json({ success: true, data: { downloadUrl, fileName: document.fileName } })
+}))
+
+router.post('/reviewer/cars/:id/decision', authenticate, requireInternalQualityReviewer, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const body = reviewerDecisionSchema.parse(req.body)
+  const before = await db.cARReport.findUnique({ where: { id: req.params.id } })
+  if (!before) { res.status(404).json({ success: false, error: 'CAR not found' }); return }
+  if (before.status !== 'VERIFICATION_PENDING') {
+    res.status(409).json({ success: false, error: 'Only CARs awaiting verification can receive a reviewer decision.' })
+    return
+  }
+
+  const now = new Date()
+  const approving = body.decision === 'APPROVE'
+  if (approving && (
+    !before.why1 || before.why1.trim().length < 10 ||
+    !before.rootCause || before.rootCause.trim().length < 10 ||
+    !before.correctiveAction || before.correctiveAction.trim().length < 10
+  )) {
+    res.status(409).json({ success: false, error: 'This CAR is missing required root-cause or corrective-action evidence and cannot be approved yet.' })
+    return
+  }
+  const nextStatus = CAR_REVIEWER_DECISION_TO_STATUS[body.decision as CARReviewerDecision]
+  const changed = await db.cARReport.updateMany({
+    where: { id: before.id, status: 'VERIFICATION_PENDING' },
+    data: {
+      status: nextStatus,
+      reviewerNotes: body.notes,
+      reviewedBy: req.auth.sub,
+      reviewedAt: now,
+      verifiedBy: approving ? req.auth.sub : null,
+      verifiedAt: approving ? now : null,
+      closedBy: approving ? req.auth.sub : null,
+      closedAt: approving ? now : null,
+      closureNotes: approving ? body.notes : null,
+      currentStep: 3,
+    },
+  })
+  if (changed.count !== 1) {
+    res.status(409).json({ success: false, error: 'CAR status changed concurrently; reload the review queue.' })
+    return
+  }
+
+  const car = await db.cARReport.findUnique({
+    where: { id: before.id },
+    include: { supplier: { select: { id: true, vendorId: true, companyName: true, contactEmail: true } } },
+  })
+  if (!car) { res.status(404).json({ success: false, error: 'CAR not found after update' }); return }
+
+  await auditService.log({
+    action: 'TRANSITION',
+    actorId: req.auth.sub,
+    actorEmail: req.auth.email,
+    actorTier: req.auth.tier,
+    ipAddress: req.ip,
+    userAgent: req.headers['user-agent'],
+    resourceType: 'CAR_REVIEW',
+    resourceId: car.id,
+    supplierId: car.supplierId,
+    carId: car.id,
+    beforeState: { status: before.status },
+    afterState: { status: car.status },
+    metadata: { decision: body.decision, reviewerNotes: body.notes, reviewerRole: req.auth.internalRole },
+  })
+
+  if (car.supplier.contactEmail) {
+    await emailService.sendCARReviewDecision({
+      carId: car.carId,
+      carDatabaseId: car.id,
+      supplierName: car.supplier.companyName,
+      toEmail: car.supplier.contactEmail,
+      decision: body.decision,
+      notes: body.notes,
+    })
+  }
+
+  res.json({ success: true, data: car })
+}))
 
 router.get(
   '/',
@@ -198,16 +339,18 @@ router.get(
 
     const overallOEE = snapshots.length
       ? snapshots.reduce((sum, snapshot) => sum + Number(snapshot.oee), 0) / snapshots.length
-      : 0
+      : null
 
     res.json({
       success: true,
       data: {
         vendorId: req.auth.vendorId,
         snapshotAt: new Date().toISOString(),
-        overallOEE: Math.round(overallOEE * 10) / 10,
-        partsShippedMTD: 142850,
-        monthlyTarget: 200000,
+        overallOEE: overallOEE === null ? null : Math.round(overallOEE * 10) / 10,
+        // Production/output figures are not fabricated: populate these only when
+        // a verified production-data integration is configured.
+        partsShippedMTD: null,
+        monthlyTarget: null,
         lines: snapshots.map(snapshot => ({
           lineId: snapshot.lineId,
           lineName: snapshot.lineName,
@@ -258,6 +401,10 @@ router.post(
   requirePermission('car:transition'),
   asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const body = transitionSchema.parse(req.body)
+    if (!SUPPLIER_CAR_TRANSITION_EVENTS.includes(body.event as CARTransitionEvent)) {
+      res.status(403).json({ success: false, error: 'CAR closure is reserved for an internal quality reviewer.' })
+      return
+    }
 
     const before = await db.cARReport.findUnique({
       where: { id: req.params.id },
@@ -271,10 +418,21 @@ router.post(
       return
     }
 
-    const newStatus = EVENT_TO_STATUS[body.event] as CARStatus
+    const allowedEvents = CAR_TRANSITIONS[before.status]
+    if (!allowedEvents.includes(body.event as CARTransitionEvent)) {
+      res.status(409).json({
+        success: false,
+        error: `Transition ${body.event} is not allowed from ${before.status}`,
+      })
+      return
+    }
 
-    const car = await db.cARReport.update({
-      where: { id: req.params.id },
+    const newStatus = CAR_EVENT_TO_STATUS[body.event as CARTransitionEvent]
+
+    // Compare-and-swap on status prevents concurrent requests from both
+    // transitioning the same CAR from the same previous state.
+    const changed = await db.cARReport.updateMany({
+      where: { id: req.params.id, supplierId: req.auth.supplierId, status: before.status },
       data: {
         status: newStatus,
         rootCause: body.rootCause,
@@ -286,14 +444,8 @@ router.post(
         why1: body.why1,
         closureNotes: body.closureNotes,
         currentStep: body.currentStep,
-        verifiedBy:
-          body.event === 'REQUEST_VERIFICATION'
-            ? req.auth.sub
-            : undefined,
-        verifiedAt:
-          body.event === 'REQUEST_VERIFICATION'
-            ? new Date()
-            : undefined,
+        // verifiedBy/verifiedAt are reserved for an internal quality reviewer.
+        // Supplier requests for verification must not be recorded as verification.
         closedBy:
           body.event === 'CLOSE'
             ? req.auth.sub
@@ -304,6 +456,16 @@ router.post(
             : undefined,
       },
     })
+
+    if (changed.count !== 1) {
+      res.status(409).json({ success: false, error: 'CAR status changed concurrently; reload and retry.' })
+      return
+    }
+    const car = await db.cARReport.findUnique({ where: { id: req.params.id } })
+    if (!car) {
+      res.status(404).json({ success: false, error: 'CAR not found' })
+      return
+    }
 
     await auditService.log({
       action: 'TRANSITION',

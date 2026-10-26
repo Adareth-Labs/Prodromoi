@@ -49,6 +49,11 @@ enum CARStatus {
   ESCALATED
 }
 
+enum InternalReviewerRole {
+  QUALITY_REVIEWER
+  QUALITY_ADMIN
+}
+
 enum AuditAction {
   CREATE
   READ
@@ -62,6 +67,19 @@ enum AuditAction {
 }
 
 // ── MODELS ───────────────────────────────────────────────────────────────────
+
+model InternalReviewer {
+  id         String               @id @default(uuid())
+  supabaseId String               @unique
+  email      String               @unique
+  name       String
+  role       InternalReviewerRole @default(QUALITY_REVIEWER)
+  isActive   Boolean              @default(true)
+  createdAt  DateTime             @default(now())
+  updatedAt  DateTime             @updatedAt
+
+  @@index([isActive, role])
+}
 
 model Supplier {
   id          String     @id @default(uuid())
@@ -154,7 +172,7 @@ model RFQ {
 model RFQDocument {
   id          String   @id @default(uuid())
   rfqId       String
-  s3Key       String
+  s3Key       String   // Legacy column/property name retained for DB compatibility; stores a Supabase Storage object key.
   fileName    String
   contentType String
   sizeBytes   Int
@@ -256,6 +274,9 @@ model CARReport {
   closedBy    String?
   closedAt    DateTime?
   closureNotes String?
+  reviewerNotes String?
+  reviewedBy   String?
+  reviewedAt   DateTime?
   currentStep Int       @default(1) // workflow step shown in the portal (1-3)
 
   assignedTo  String?   // Supabase user ID (quality inspector)
@@ -389,4 +410,19 @@ model PublicRFQLead {
   step          Int
   convertedToId String?   // RFQ.id, once converted
   createdAt     DateTime  @default(now())
+  documents     PublicRFQLeadDocument[]
+}
+
+model PublicRFQLeadDocument {
+  id          String   @id @default(uuid())
+  leadId      String
+  storageKey  String   @unique
+  fileName    String
+  contentType String
+  sizeBytes   Int
+  createdAt   DateTime @default(now())
+
+  lead PublicRFQLead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
 }

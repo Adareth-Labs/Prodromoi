@@ -30,6 +30,15 @@ interface CAREmailData {
   description: string
 }
 
+interface CARReviewEmailData {
+  carId: string
+  carDatabaseId: string
+  supplierName: string
+  toEmail: string
+  decision: 'APPROVE' | 'REQUEST_CHANGES'
+  notes: string
+}
+
 interface EmailMessage {
   to: string
   subject: string
@@ -41,7 +50,7 @@ interface CtaButtonData {
   label: string
 }
 
-const PORTAL_URL = env.API_BASE_URL.replace('api.', 'portal.')
+const PORTAL_URL = env.PORTAL_URL ?? (env.NODE_ENV === 'development' ? 'http://localhost:3000' : 'https://portal.precisioncore.com')
 const SMTP_CONFIGURATION_MESSAGE = 'SMTP not configured — email skipped'
 
 const STATUS_SUBJECT: Partial<Record<RFQStatus, string>> = {
@@ -70,6 +79,13 @@ const CAR_SEVERITY_STYLES: Record<
   },
 }
 
+const escapeHtml = (value: unknown): string => String(value ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;')
+
 const renderEmailShell = (bodyHtml: string): string => `
   <div style="font-family:system-ui,sans-serif;max-width:600px;margin:0 auto;padding:40px 24px">
     <div style="font-size:20px;font-weight:500;letter-spacing:-0.02em;margin-bottom:32px">PRECISIONCORE</div>
@@ -81,7 +97,7 @@ const renderEmailShell = (bodyHtml: string): string => `
 `
 
 const renderCtaButton = ({ href, label }: CtaButtonData): string => `
-  <a href="${href}"
+  <a href="${escapeHtml(href)}"
      style="display:inline-block;background:#1a1c1e;color:#fff;padding:12px 24px;font-family:monospace;font-size:11px;letter-spacing:0.05em;text-transform:uppercase;text-decoration:none">
     ${label}
   </a>
@@ -99,18 +115,18 @@ class EmailService {
     const subject = STATUS_SUBJECT[status] ?? `RFQ Update: ${trackingId}`
 
     const html = renderEmailShell(`
-      <h1 style="font-size:20px;font-weight:500;margin-bottom:8px">${subject}</h1>
+      <h1 style="font-size:20px;font-weight:500;margin-bottom:8px">${escapeHtml(subject)}</h1>
       <p style="color:#444748;font-size:15px;margin-bottom:24px">
-        Your RFQ <strong>${trackingId}</strong> for <strong>${partFamily}</strong>
-        has been updated to: <strong>${status.replace(/_/g, ' ')}</strong>.
+        Your RFQ <strong>${escapeHtml(trackingId)}</strong> for <strong>${escapeHtml(partFamily)}</strong>
+        has been updated to: <strong>${escapeHtml(status.replace(/_/g, ' '))}</strong>.
       </p>
       ${
         reviewNotes
-          ? `<div style="background:#f3f4f5;padding:16px;border-left:3px solid #1a1c1e;margin-bottom:24px;font-size:14px;color:#444748">${reviewNotes}</div>`
+          ? `<div style="background:#f3f4f5;padding:16px;border-left:3px solid #1a1c1e;margin-bottom:24px;font-size:14px;color:#444748">${escapeHtml(reviewNotes)}</div>`
           : ''
       }
       ${renderCtaButton({
-        href: `${portalUrl ?? PORTAL_URL}/rfq/${trackingId}`,
+        href: `${portalUrl ?? PORTAL_URL}/rfq/${encodeURIComponent(trackingId)}`, 
         label: 'View in Portal',
       })}
     `)
@@ -134,11 +150,11 @@ class EmailService {
       renderEmailShell(`
         <h1 style="font-size:20px;font-weight:500;margin-bottom:8px">${heading}</h1>
         <p style="color:#444748;font-size:15px;margin-bottom:24px">
-          <strong>${supplierName}</strong> has uploaded a <strong>${documentType}</strong>
-          for platform <strong>${platformId}</strong>.
+          <strong>${escapeHtml(supplierName)}</strong> has uploaded a <strong>${escapeHtml(documentType)}</strong>
+          for platform <strong>${escapeHtml(platformId)}</strong>.
         </p>
         ${renderCtaButton({
-          href: `${PORTAL_URL}/ppap?supplier=${supplierId}`,
+          href: `${PORTAL_URL}/ppap?supplier=${encodeURIComponent(supplierId)}`, 
           label: 'Review Document',
         })}
       `)
@@ -167,16 +183,16 @@ class EmailService {
       CAR_SEVERITY_STYLES[severity] ?? CAR_SEVERITY_STYLES.DEFAULT
 
     const html = renderEmailShell(`
-      <h1 style="font-size:20px;font-weight:500;margin-bottom:8px">CAR Assigned: ${carId}</h1>
+      <h1 style="font-size:20px;font-weight:500;margin-bottom:8px">CAR Assigned: ${escapeHtml(carId)}</h1>
       <div style="background:${severityStyle.background};border-left:3px solid ${severityStyle.colour};padding:12px 16px;margin-bottom:20px;font-size:13px">
-        Severity: <strong>${severity}</strong>
+        Severity: <strong>${escapeHtml(severity)}</strong>
       </div>
-      <p style="color:#444748;font-size:15px;margin-bottom:8px">Hello ${assignedName},</p>
+      <p style="color:#444748;font-size:15px;margin-bottom:8px">Hello ${escapeHtml(assignedName)},</p>
       <p style="color:#444748;font-size:15px;margin-bottom:24px">
-        A corrective action report has been assigned to you: <em>${description}</em>
+        A corrective action report has been assigned to you: <em>${escapeHtml(description)}</em>
       </p>
       ${renderCtaButton({
-        href: `${PORTAL_URL}/quality/car/${carId}`,
+        href: `${PORTAL_URL}/quality/car/${encodeURIComponent(carId)}`, 
         label: 'Open CAR Report',
       })}
     `)
@@ -186,6 +202,33 @@ class EmailService {
       subject: `CAR Assigned: ${carId} [${severity}]`,
       html,
     })
+  }
+
+  async sendCARReviewDecision({
+    carId,
+    carDatabaseId,
+    supplierName,
+    toEmail,
+    decision,
+    notes,
+  }: CARReviewEmailData): Promise<void> {
+    const approved = decision === 'APPROVE'
+    const subject = approved
+      ? `Corrective Action Approved: ${carId}`
+      : `Action Required: Update Corrective Action ${carId}`
+    const summary = approved
+      ? 'An internal PrecisionCore quality reviewer has verified and closed this corrective action report.'
+      : 'An internal PrecisionCore quality reviewer has requested changes. Please review the notes and resubmit your corrective action plan.'
+    const html = renderEmailShell(`
+      <h1 style="font-size:20px;font-weight:500;margin-bottom:8px">${escapeHtml(subject)}</h1>
+      <p style="color:#444748;font-size:14px;margin-bottom:16px">Hello ${escapeHtml(supplierName)},</p>
+      <p style="color:#444748;font-size:14px;line-height:1.6;margin-bottom:20px">${escapeHtml(summary)}</p>
+      <div style="background:#f3f4f5;padding:16px;border-left:3px solid ${approved ? '#16a34a' : '#d97706'};margin-bottom:24px;font-size:14px;color:#444748;white-space:pre-wrap">
+        <strong>Reviewer notes</strong><br/>${escapeHtml(notes)}
+      </div>
+      ${renderCtaButton({ href: `${PORTAL_URL}/car/${encodeURIComponent(carDatabaseId)}`, label: approved ? 'View Closed CAR' : 'Update CAR' })}
+    `)
+    await this.send({ to: toEmail, subject, html })
   }
 
   private async send({ to, subject, html }: EmailMessage): Promise<void> {

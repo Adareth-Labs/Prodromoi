@@ -1,16 +1,7 @@
-version: '3.9'
-
-# Prometheus + Grafana + Loki — complete open-source observability stack
-#
-# Usage:
-#   docker compose -f docker-compose.monitoring.yml up -d
-#
-# Dashboards:  http://localhost:3100  (Grafana  — admin / admin on first run)
-# Metrics UI:  http://localhost:9090  (Prometheus)
-# Logs UI:     http://localhost:3200  (Loki — query via Grafana, not directly)
-#
-# The API /metrics endpoint must be reachable from inside this Docker network.
-# If your API runs outside Docker, update the prometheus target to host.docker.internal:3001
+# Local observability stack for PrecisionCore.
+# Configure a unique GRAFANA_PASSWORD in monitoring/.env before starting.
+# Published UI ports bind to loopback only; put an authenticated reverse proxy in
+# front of them before making any monitoring service reachable remotely.
 
 networks:
   monitoring:
@@ -18,43 +9,37 @@ networks:
 
 volumes:
   prometheus_data: {}
-  grafana_data:    {}
-  loki_data:       {}
+  grafana_data: {}
+  loki_data: {}
 
 services:
-
-  # ── Prometheus ──────────────────────────────────────────────────────────────
   prometheus:
     image: prom/prometheus:v2.51.0
     container_name: prometheus
     restart: unless-stopped
     networks: [monitoring]
     ports:
-      - '9090:9090'
+      - '127.0.0.1:9090:9090'
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/secrets:/etc/prometheus/secrets:ro
       - prometheus_data:/prometheus
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
       - --storage.tsdb.retention.time=30d
-      - --web.enable-lifecycle
-      - --web.enable-admin-api
 
-  # ── Loki (log aggregation) ──────────────────────────────────────────────────
   loki:
     image: grafana/loki:2.9.6
     container_name: loki
     restart: unless-stopped
     networks: [monitoring]
-    ports:
-      - '3200:3100'
+    # No host port: Loki is available to Grafana over the private Docker network only.
     volumes:
       - ./loki/loki-config.yml:/etc/loki/loki-config.yml:ro
       - loki_data:/loki
     command: -config.file=/etc/loki/loki-config.yml
 
-  # ── Promtail (log shipper → Loki) ──────────────────────────────────────────
   promtail:
     image: grafana/promtail:2.9.6
     container_name: promtail
@@ -62,20 +47,17 @@ services:
     networks: [monitoring]
     volumes:
       - ./promtail/promtail-config.yml:/etc/promtail/promtail-config.yml:ro
-      # Mount your app log directories here:
-      - ../precisioncore-api/logs:/var/log/api:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro   # also scrape Docker stdout
+      - ../api/logs:/var/log/api:ro
     command: -config.file=/etc/promtail/promtail-config.yml
     depends_on: [loki]
 
-  # ── Node Exporter (host system metrics) ────────────────────────────────────
   node-exporter:
     image: prom/node-exporter:v1.7.0
     container_name: node_exporter
     restart: unless-stopped
     networks: [monitoring]
     ports:
-      - '9100:9100'
+      - '127.0.0.1:9100:9100'
     volumes:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
@@ -86,19 +68,18 @@ services:
       - --path.sysfs=/host/sys
       - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)
 
-  # ── Grafana ─────────────────────────────────────────────────────────────────
   grafana:
     image: grafana/grafana:10.4.2
     container_name: grafana
     restart: unless-stopped
     networks: [monitoring]
     ports:
-      - '3100:3000'
+      - '127.0.0.1:3100:3000'
     environment:
-      GF_SECURITY_ADMIN_USER:     admin
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-changeme}
-      GF_USERS_ALLOW_SIGN_UP:     'false'
-      GF_SERVER_ROOT_URL:         ${GRAFANA_URL:-http://localhost:3100}
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:?Set a unique GRAFANA_PASSWORD in monitoring/.env}
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_SERVER_ROOT_URL: ${GRAFANA_URL:-http://localhost:3100}
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro

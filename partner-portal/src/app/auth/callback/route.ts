@@ -16,10 +16,10 @@ export async function GET(request: Request) {
   }
 
   // 2. Validate the 'next' parameter to prevent Open Redirect vulnerabilities
-  const nextParam = searchParams.get('next') ?? '/dashboard';
+  const nextParam = searchParams.get('next') ?? '/';
   const next = nextParam.startsWith('/') && !nextParam.startsWith('//') 
     ? nextParam 
-    : '/dashboard';
+    : '/';
 
   // 3. Exchange the PKCE code for a secure session
   if (code) {

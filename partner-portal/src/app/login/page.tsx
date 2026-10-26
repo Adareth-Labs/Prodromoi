@@ -1,4 +1,5 @@
 'use client';
+import { automotiveImage } from '@/lib/automotive-image';
 // src/app/login/page.tsx
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -33,7 +34,7 @@ export default function LoginPage() {
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) { setError(error.message); setLoading(null); }
-      else { router.push('/dashboard'); router.refresh(); }
+      else { router.push('/'); router.refresh(); }
     } catch (err) {
       console.error('[login] password sign-in failed', err);
       setError('Something went wrong signing in. Please try again.');
@@ -90,7 +91,7 @@ export default function LoginPage() {
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
       {/* ── Left branding panel ── */}
-      <div style={{ flex: 1, padding: '52px 60px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', borderRight: `1px solid ${C.borderDark}`, minWidth: 0 }}
+      <div style={{ flex: 1, padding: '52px 60px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', borderRight: `1px solid ${C.borderDark}`, minWidth: 0, backgroundImage: `linear-gradient(115deg, rgba(0,2,10,.96) 8%, rgba(0,2,10,.72) 100%), url('${automotiveImage("automated-manufacturing-line.webp")}')`, backgroundSize: 'cover', backgroundPosition: 'center' }}
            className="hide-mobile">
         <div>
           <div style={{ marginBottom: 52 }}>
@@ -108,6 +109,20 @@ export default function LoginPage() {
           <p style={{ fontSize: 14, color: `${C.textLight}55`, lineHeight: '24px', maxWidth: 380 }}>
             Secure gateway for Tier 1–3 automotive suppliers. Technical documentation, quality compliance, and manufacturing intelligence — behind role-based authentication.
           </p>
+        </div>
+
+        {/* Automotive imagery — local assets keep the sign-in screen self-contained. */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, marginTop: 26, marginBottom: 24 }}>
+          {[
+            { src: automotiveImage('thermal-management-diagram.webp'), alt: 'Battery thermal management illustration', label: 'Thermal' },
+            { src: automotiveImage('adas-camera-module.webp'), alt: 'Automotive driver assistance camera module', label: 'Sensing' },
+            { src: automotiveImage('electric-drive-unit.webp'), alt: 'Automotive electric drive unit', label: 'Drivetrain' },
+          ].map((item) => (
+            <div key={item.label} style={{ minWidth: 0, border: `1px solid ${C.borderDark}`, background: `${C.bgCard}dd` }}>
+              <img src={item.src} alt={item.alt} loading="lazy" style={{ display: 'block', width: '100%', height: 66, objectFit: 'cover' }} />
+              <div style={{ padding: '7px 8px', fontFamily: "'JetBrains Mono', monospace", fontSize: 8, letterSpacing: '0.08em', textTransform: 'uppercase', color: `${C.textLight}88` }}>{item.label}</div>
+            </div>
+          ))}
         </div>
 
         {/* Tier architecture */}

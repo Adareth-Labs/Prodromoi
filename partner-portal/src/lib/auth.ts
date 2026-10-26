@@ -4,6 +4,15 @@ import { apiFetchServer } from '@/lib/api-server';
 import { normalizeTier } from '@/lib/mappers';
 import type { PortalUser, Tier } from '@/types';
 
+export interface QualityReviewer {
+  sub: string;
+  email: string;
+  name: string;
+  role: 'QUALITY_REVIEWER' | 'QUALITY_ADMIN';
+}
+
+interface QualityReviewerResponse { data: { sub: string; email: string; name: string; role: 'QUALITY_REVIEWER' | 'QUALITY_ADMIN' } }
+
 interface SupplierResponse {
   data: {
     id: string;
@@ -101,4 +110,25 @@ export const requirePortalUser = async (
   }
 
   return user;
+};
+
+export const getQualityReviewer = async (): Promise<QualityReviewer | null> => {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  try {
+    const response = await apiFetchServer<QualityReviewerResponse>('/v1/quality/reviewer/me');
+    return response.data;
+  } catch {
+    // A valid supplier login is not an internal reviewer login; failure here is
+    // an expected role check, not an authentication bypass.
+    return null;
+  }
+};
+
+export const requireQualityReviewer = async (): Promise<QualityReviewer> => {
+  const reviewer = await getQualityReviewer();
+  if (!reviewer) redirect('/login?error=reviewer_access_required');
+  return reviewer;
 };

@@ -37,14 +37,14 @@ function denyAccess({ req, res, resourceType, resourceId, message, metadata }: D
 // Require a minimum tier level
 export const requireTier = (minTier: PortalTier) =>
   (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
-    if (TIER_RANK[req.auth.tier] >= TIER_RANK[minTier]) { next(); return }
+    if (req.auth.actorType === 'SUPPLIER' && TIER_RANK[req.auth.tier] >= TIER_RANK[minTier]) { next(); return }
 
     denyAccess({
       req, res,
       resourceType: 'Route',
       resourceId:   req.path,
-      message:      `This resource requires ${minTier} access. Your current tier is ${req.auth.tier}.`,
-      metadata:     { requiredTier: minTier, userTier: req.auth.tier },
+      message:      req.auth.actorType === 'INTERNAL' ? 'This route is restricted to supplier accounts.' : `This resource requires ${minTier} access. Your current tier is ${req.auth.tier}.`,
+      metadata:     { requiredTier: minTier, userTier: req.auth.tier, actorType: req.auth.actorType },
     })
   }
 
@@ -52,19 +52,36 @@ export const requireTier = (minTier: PortalTier) =>
 export const requirePermission = (permission: string) =>
   (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
     const allowed = TIER_PERMISSIONS[permission] ?? []
-    if (allowed.includes(req.auth.tier)) { next(); return }
+    if (req.auth.actorType === 'SUPPLIER' && allowed.includes(req.auth.tier)) { next(); return }
 
     denyAccess({
       req, res,
       resourceType: 'Permission',
       resourceId:   permission,
-      message:      `Permission '${permission}' is not available for tier ${req.auth.tier}.`,
+      message:      req.auth.actorType === 'INTERNAL' ? 'This permission is restricted to supplier accounts.' : `Permission '${permission}' is not available for tier ${req.auth.tier}.`,
     })
   }
 
 // Ensure the request actor belongs to the supplier they are accessing
 export const requireSameSupplier = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
   const paramSupplierId = req.params.supplierId
-  if (!paramSupplierId || paramSupplierId === req.auth.supplierId) { next(); return }
+  if (req.auth.actorType === 'SUPPLIER' && (!paramSupplierId || paramSupplierId === req.auth.supplierId)) { next(); return }
   res.status(403).json({ success: false, error: 'Access denied to this supplier.' })
+}
+
+// Internal quality-review endpoints are restricted to accounts explicitly
+// provisioned in InternalReviewer. Supplier tier/metadata never grants this role.
+export const requireInternalQualityReviewer = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+  const role = req.auth?.internalRole
+  if (req.auth?.actorType === 'INTERNAL' && (role === 'QUALITY_REVIEWER' || role === 'QUALITY_ADMIN')) {
+    next()
+    return
+  }
+  denyAccess({
+    req, res,
+    resourceType: 'InternalQualityReview',
+    resourceId: req.path,
+    message: 'Access is restricted to authorized internal quality reviewers.',
+    metadata: { actorType: req.auth?.actorType ?? 'UNKNOWN' },
+  })
 }

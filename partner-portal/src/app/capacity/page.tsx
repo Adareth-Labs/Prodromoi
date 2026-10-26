@@ -10,5 +10,5 @@ export default async function CapacityPage() {
     console.error('[CapacityPage] API request failed', err);
     return { data: null };
   });
-  return <CapacityClient user={user} lines={response.data?.lines ?? []} history={response.data?.weeklyHistory ?? []} overallOEE={response.data?.overallOEE ?? 0} />;
+  return <CapacityClient user={user} lines={response.data?.lines ?? []} history={response.data?.weeklyHistory ?? []} overallOEE={response.data?.overallOEE ?? null} />;
 }

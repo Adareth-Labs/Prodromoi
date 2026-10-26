@@ -17,7 +17,7 @@ const CERT_KEYS: Record<string, string> = {
   'iso-45001':  'certs/global/iso-45001-2022.pdf',
 }
 
-// Shared by every route below — they only differ in which S3 key to sign.
+// Shared by every route below — they only differ in which Supabase Storage object key to sign.
 // (Previously this logic was copy-pasted three times; the varying part is
 // now just the key.)
 async function respondWithDownload(req: AuthenticatedRequest, res: Response, key: string): Promise<void> {
@@ -28,7 +28,7 @@ async function respondWithDownload(req: AuthenticatedRequest, res: Response, key
   })
   // Report the URL's *actual* configured lifetime instead of a hardcoded
   // number, so this can never drift from what getDownloadUrl really signed.
-  res.json({ success: true, data: { downloadUrl, key, expiresIn: env.R2_PRESIGN_EXPIRY } })
+  res.json({ success: true, data: { downloadUrl, key, expiresIn: env.STORAGE_SIGNED_URL_EXPIRY } })
 }
 
 router.get('/certs/:certId', authenticate, requirePermission('document:certs'), downloadLimiter, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {

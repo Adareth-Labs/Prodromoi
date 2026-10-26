@@ -5,7 +5,7 @@ import type { Metadata } from 'next'
 
 export const revalidate = 3600
 
-interface PageProps { params: { slug: string } }
+interface PageProps { params: Promise<{ slug: string }> }
 
 export async function generateStaticParams() {
   const slugs = await getAllSolutionSlugs()
@@ -13,7 +13,8 @@ export async function generateStaticParams() {
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const solution = await getSolutionBySlug(params.slug)
+  const { slug } = await params
+  const solution = await getSolutionBySlug(slug)
   if (!solution) return {}
   return {
     title:       solution.metaTitle ?? solution.name,
@@ -22,7 +23,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function SolutionDetailPage({ params }: PageProps) {
-  const solution = await getSolutionBySlug(params.slug)
+  const { slug } = await params
+  const solution = await getSolutionBySlug(slug)
   if (!solution) notFound()
 
   const PORTAL_URL = process.env.NEXT_PUBLIC_PORTAL_URL ?? 'https://portal.precisioncore.com'

@@ -1,12 +1,13 @@
 'use client';
 import { useState } from 'react';
+import Link from 'next/link';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
-import { Badge, SectionHeader, SecondaryButton } from '@/components/ui';
+import { Badge, SectionHeader } from '@/components/ui';
 import { colors } from '@/styles/tokens';
 import type { PortalUser } from '@/types';
 const C = colors;
 
-export default function CARClient({ user, initialCARs }: { user: PortalUser; initialCARs: any[] }) {
+export default function CARClient({ user: _user, initialCARs }: { user: PortalUser; initialCARs: any[] }) {
   const { mob, tab } = useBreakpoint();
   const [cars] = useState(initialCARs);
   const pad = mob ? 14 : tab ? 20 : 26;
@@ -26,7 +27,7 @@ export default function CARClient({ user, initialCARs }: { user: PortalUser; ini
       <div style={{ background: C.surfaceCard, border: `1px solid ${C.borderLight}` }}>
         <div style={{ padding: '13px 18px', borderBottom: `1px solid ${C.borderLight}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontSize: 11, fontFamily: "'JetBrains Mono', monospace", color: C.textFaint, textTransform: 'uppercase' as const, letterSpacing: '0.1em' }}>All CARs</div>
-          <SecondaryButton icon="add">New CAR</SecondaryButton>
+          <Link href="/car/new" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 12px', border: `1px solid ${C.borderLight}`, color: C.textDark, fontSize: 12, textDecoration: 'none' }}><span className="material-symbols-outlined" style={{ fontSize: 16 }}>add</span>New CAR</Link>
         </div>
         {cars.length === 0 && <div style={{ padding: '52px 20px', textAlign: 'center', color: C.textFaint, fontSize: 13 }}>No corrective action requests yet.</div>}
         {cars.map((car, i) => (
@@ -43,6 +44,7 @@ export default function CARClient({ user, initialCARs }: { user: PortalUser; ini
                 Opened: {new Date(car.openedAt).toLocaleDateString()} · {car.affectedQty.toLocaleString()} units · Step {car.currentStep}/3
               </div>
             </div>
+            <Link href={`/car/${encodeURIComponent(car.id)}`} style={{ color: C.textDark, border: `1px solid ${C.borderLight}`, padding: '7px 10px', fontSize: 11, textDecoration: 'none', whiteSpace: 'nowrap' }}>Open</Link>
           </div>
         ))}
       </div>

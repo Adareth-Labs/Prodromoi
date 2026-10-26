@@ -6,11 +6,12 @@ import CARDetailClient from './CARDetailClient';
 import type { Metadata } from 'next';
 export const metadata: Metadata = { title: 'CAR Detail' };
 
-export default async function CARDetailPage({ params }: { params: { id: string } }) {
-  const user = await requirePortalUser({ minTier: 3 });
+export default async function CARDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const user = await requirePortalUser({ minTier: 2 });
   if (!user.supplierId) redirect('/dashboard');
 
-  const response = await apiFetchServer<any>(`/v1/quality/${params.id}`).catch((err) => {
+  const response = await apiFetchServer<any>(`/v1/quality/${encodeURIComponent(id)}`).catch((err) => {
     console.error('[CARDetailPage] API request failed', err);
     return { data: null };
   });

@@ -128,13 +128,13 @@ export function SelectInput({ value, onChange, options }: {
   );
 }
 
-export function TextArea({ value, onChange, placeholder, rows = 4 }: {
-  value: string; onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
-  placeholder?: string; rows?: number;
+export function TextArea({ value, onChange, placeholder, rows = 4, readOnly }: {
+  value: string; onChange?: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  placeholder?: string; rows?: number; readOnly?: boolean;
 }) {
   return (
-    <textarea rows={rows} value={value} onChange={onChange} placeholder={placeholder}
-      style={{ ...inputBase, resize: 'vertical' }}
+    <textarea rows={rows} value={value} onChange={onChange} placeholder={placeholder} readOnly={readOnly}
+      style={{ ...inputBase, resize: readOnly ? 'none' : 'vertical', background: readOnly ? C.surfaceLow : inputBase.background }}
       onFocus={e => e.target.style.borderColor = C.textDark}
       onBlur={e => e.target.style.borderColor = C.borderLight}
     />

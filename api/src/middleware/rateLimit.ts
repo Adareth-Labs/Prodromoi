@@ -28,11 +28,21 @@ export const rfqLimiter = rateLimit({
   message: { success: false, error: 'RFQ submission limit reached.' },
 })
 
-// Public website RFQ intake — intentionally unauthenticated, protected by CORS + strict per-IP limiting.
-export const publicRfqLimiter = rateLimit({
+// Public website RFQ intake is intentionally unauthenticated. Separate
+// upload-url limits from submission limits so the allowed five attachments
+// do not exhaust the submission quota before the lead can be submitted.
+export const publicRfqUploadLimiter = rateLimit({
+  windowMs: ONE_HOUR_MS,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: 'Document upload limit reached. Please try again later.' },
+})
+
+export const publicRfqSubmissionLimiter = rateLimit({
   windowMs: ONE_HOUR_MS,
   max: 5,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { success: false, error: 'RFQ submission limit reached.' },
+  message: { success: false, error: 'RFQ submission limit reached. Please try again later.' },
 })

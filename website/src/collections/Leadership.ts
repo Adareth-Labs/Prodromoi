@@ -1,6 +1,7 @@
 import type { CollectionConfig } from 'payload'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
 
+import { triggerContentRevalidation } from '../lib/revalidate-content'
 export const Leadership: CollectionConfig = {
   slug: 'leadership',
   labels: { singular: 'Leader', plural: 'Leadership' },
@@ -61,4 +62,12 @@ export const Leadership: CollectionConfig = {
       },
     },
   ],
+  hooks: {
+    afterChange: [
+      async ({ doc }) => {
+        await triggerContentRevalidation('leadershipProfile', (doc as { slug?: string }).slug)
+        return doc
+      },
+    ],
+  },
 }

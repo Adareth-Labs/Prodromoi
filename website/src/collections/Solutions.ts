@@ -1,6 +1,7 @@
 import type { CollectionConfig } from 'payload'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
 
+import { triggerContentRevalidation } from '../lib/revalidate-content'
 export const Solutions: CollectionConfig = {
   slug: 'solutions',
   labels: { singular: 'Solution', plural: 'Solutions' },
@@ -157,15 +158,10 @@ export const Solutions: CollectionConfig = {
   hooks: {
     afterChange: [
       async ({ doc }) => {
-        // Trigger Next.js ISR revalidation
-        if (process.env.NEXT_PUBLIC_SITE_URL && process.env.REVALIDATION_SECRET) {
-          await fetch(
-            `${process.env.NEXT_PUBLIC_SITE_URL}/api/revalidate?secret=${process.env.REVALIDATION_SECRET}&tag=solutions`,
-            { method: 'POST' }
-          ).catch(console.error)
-        }
+        // Trigger Next.js ISR revalidation for the listing and specific solution.
+        await triggerContentRevalidation('solution', doc.slug)
         return doc
-      },
+      }
     ],
   },
 }

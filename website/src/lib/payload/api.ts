@@ -2,7 +2,7 @@
  * Payload Local API helpers for Next.js server components.
  *
  * Payload is the website CMS. Content is stored in the same Postgres database
- * used by the Payload application, and media is stored in Cloudflare R2.
+ * used by the Payload application, and media is stored in Supabase Storage through its S3-compatible protocol.
  */
 
 import { getPayloadHMR } from '@payloadcms/next/utilities'

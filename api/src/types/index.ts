@@ -2,6 +2,8 @@
 // Once `prisma generate` has run, these can be imported from '@prisma/client'
 
 export type PortalTier = 'BASIC' | 'QUALIFIED' | 'STRATEGIC'
+export type InternalReviewerRole = 'QUALITY_REVIEWER' | 'QUALITY_ADMIN'
+export type AuthActorType = 'SUPPLIER' | 'INTERNAL'
 
 export type RFQStatus =
   | 'DRAFT'
@@ -23,6 +25,43 @@ export type CARStatus =
   | 'CLOSED'
   | 'ESCALATED'
 
+
+export type CARTransitionEvent =
+  | 'IDENTIFY_ROOT_CAUSE'
+  | 'SUBMIT_ACTION_PLAN'
+  | 'REQUEST_VERIFICATION'
+  | 'CLOSE'
+  | 'ESCALATE'
+
+export type CARReviewerDecision = 'APPROVE' | 'REQUEST_CHANGES'
+export const CAR_REVIEWER_DECISION_TO_STATUS: Record<CARReviewerDecision, CARStatus> = {
+  APPROVE: 'CLOSED',
+  REQUEST_CHANGES: 'ACTION_PLAN_SUBMITTED',
+}
+
+export const CAR_TRANSITIONS: Record<CARStatus, CARTransitionEvent[]> = {
+  OPEN: ['IDENTIFY_ROOT_CAUSE', 'ESCALATE'],
+  ROOT_CAUSE_IDENTIFIED: ['SUBMIT_ACTION_PLAN', 'ESCALATE'],
+  ACTION_PLAN_SUBMITTED: ['REQUEST_VERIFICATION', 'ESCALATE'],
+  VERIFICATION_PENDING: ['CLOSE', 'SUBMIT_ACTION_PLAN', 'ESCALATE'],
+  ESCALATED: ['IDENTIFY_ROOT_CAUSE', 'SUBMIT_ACTION_PLAN', 'REQUEST_VERIFICATION'],
+  CLOSED: [],
+}
+
+export const CAR_EVENT_TO_STATUS: Record<CARTransitionEvent, CARStatus> = {
+  IDENTIFY_ROOT_CAUSE: 'ROOT_CAUSE_IDENTIFIED',
+  SUBMIT_ACTION_PLAN: 'ACTION_PLAN_SUBMITTED',
+  REQUEST_VERIFICATION: 'VERIFICATION_PENDING',
+  CLOSE: 'CLOSED',
+  ESCALATE: 'ESCALATED',
+}
+
+// Supplier users can document corrective action and request verification, but
+// cannot independently close their own CAR. Closure needs an internal reviewer flow.
+export const SUPPLIER_CAR_TRANSITION_EVENTS: CARTransitionEvent[] = [
+  'IDENTIFY_ROOT_CAUSE', 'SUBMIT_ACTION_PLAN', 'REQUEST_VERIFICATION', 'ESCALATE',
+]
+
 export type AuditAction =
   | 'CREATE' | 'READ' | 'UPDATE' | 'DELETE'
   | 'TRANSITION' | 'DOWNLOAD' | 'LOGIN' | 'LOGOUT' | 'ACCESS_DENIED'
@@ -35,12 +74,14 @@ import 'express'
 declare module 'express-serve-static-core' {
   interface Request {
     auth: {
-      sub:        string
-      email:      string
-      name:       string
-      tier:       PortalTier
-      supplierId: string
-      vendorId:   string
+      sub:          string
+      email:        string
+      name:         string
+      tier:         PortalTier
+      supplierId:   string
+      vendorId:     string
+      actorType:    AuthActorType
+      internalRole?: InternalReviewerRole
     }
   }
 }
@@ -62,6 +103,10 @@ export type RFQTransitionEvent =
   | 'REJECT'
   | 'MARK_IN_PRODUCTION'
   | 'CANCEL'
+
+// The partner portal represents supplier users, not internal reviewers. Only
+// supplier-owned actions may be submitted through its public-facing API route.
+export const SUPPLIER_RFQ_TRANSITION_EVENTS: RFQTransitionEvent[] = ['SUBMIT', 'CANCEL']
 
 export const RFQ_TRANSITIONS: Record<RFQStatus, RFQTransitionEvent[]> = {
   DRAFT:                  ['SUBMIT', 'CANCEL'],

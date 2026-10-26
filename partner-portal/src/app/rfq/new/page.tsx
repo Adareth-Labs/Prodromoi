@@ -1,6 +1,6 @@
 'use client';
 // src/app/rfq/new/page.tsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiFetch, getPortalUserClient } from '@/lib/api';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
@@ -35,7 +35,7 @@ export default function RFQNewPage() {
   const [refId, setRefId]     = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading]   = useState<string | null>(null);
-  const [s3Log, setS3Log]           = useState('');
+  const [storageLog, setStorageLog] = useState('');
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [formError, setFormError] = useState('');
   const [draftId, setDraftId] = useState<string | null>(null);
@@ -61,19 +61,50 @@ export default function RFQNewPage() {
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
       setForm(p => ({ ...p, [k]: e.target.value }));
 
+  const validateRequiredFields = (): boolean => {
+    if (!form.partNumber.trim() || !form.partName.trim() || !form.drawingRef.trim() || !form.annualVolume.trim() || !form.targetPrice.trim() || !form.requiredBy) {
+      setFormError('Complete all required fields: part number, drawing reference, part name, annual volume, target price and required delivery date.');
+      return false;
+    }
+    const volume = Number(form.annualVolume);
+    const price = Number(form.targetPrice);
+    if (!Number.isSafeInteger(volume) || volume <= 0) {
+      setFormError('Annual volume must be a positive whole number.');
+      return false;
+    }
+    if (!Number.isFinite(price) || price < 0) {
+      setFormError('Target price must be a valid non-negative amount.');
+      return false;
+    }
+    if (Number.isNaN(Date.parse(form.requiredBy))) {
+      setFormError('Choose a valid required delivery date.');
+      return false;
+    }
+    setFormError('');
+    return true;
+  };
+
   const ensureDraft = async () => {
-    if (draftId) return draftId;
+    if (!validateRequiredFields()) throw new Error('Please correct the required RFQ fields before continuing.');
     const payload = {
-      partNumber: form.partNumber || 'PT-7A-CRANK-001',
-      partName: form.partName || 'Precision Crankshaft Assembly',
-      annualVolume: parseInt(form.annualVolume || '45000'),
-      targetPrice: parseFloat(form.targetPrice || '124.00'),
+      partNumber: form.partNumber.trim(),
+      partName: form.partName.trim(),
+      annualVolume: Number(form.annualVolume),
+      targetPrice: Number(form.targetPrice),
       material: form.material !== 'Select...' ? form.material : undefined,
       toleranceClass: form.toleranceClass !== 'Select...' ? form.toleranceClass : undefined,
-      drawingRef: form.drawingRef || undefined,
-      requiredBy: form.requiredBy ? new Date(form.requiredBy).toISOString() : undefined,
-      notes: form.notes || undefined,
+      drawingRef: form.drawingRef.trim(),
+      requiredBy: new Date(form.requiredBy).toISOString(),
+      notes: form.notes.trim() || undefined,
     };
+    if (draftId) {
+      const updated = await apiFetch<any>(`/v1/rfq/${encodeURIComponent(draftId)}`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      });
+      if (!updated.data?.id) throw new Error('API did not confirm the RFQ draft update');
+      return draftId;
+    }
     const json = await apiFetch<any>('/v1/rfq', { method: 'POST', body: JSON.stringify(payload) });
     const id = json.data?.id as string | undefined;
     if (!id) throw new Error('API did not return the RFQ id');
@@ -81,21 +112,34 @@ export default function RFQNewPage() {
     return id;
   };
 
-  const handleUpload = async (docType: string) => {
-    setUploading(docType); setS3Log(''); setFormError('');
+  const handleUpload = async (docType: string, file: File) => {
+    setUploading(docType); setStorageLog(''); setFormError('');
     try {
+      if (file.size > 25 * 1024 * 1024) throw new Error('File exceeds the 25 MB bucket limit.');
       const rfqId = await ensureDraft();
-      const fileName = `${docType.replace(/\W+/g,'-').toLowerCase()}-${Date.now()}.pdf`;
+      const contentType = file.type || 'application/octet-stream';
       const json = await apiFetch<any>(`/v1/rfq/${rfqId}/documents/upload-url`, {
         method: 'POST',
-        body: JSON.stringify({ fileName, contentType: 'application/pdf', sizeBytes: 4_200_000 }),
+        body: JSON.stringify({ fileName: file.name, contentType, sizeBytes: file.size }),
       });
       const { uploadUrl, key } = json.data ?? {};
-      setS3Log(`R2 PUT ${uploadUrl?.split('?')[0] ?? '...'}\ncontent-type: application/pdf\n\nPre-signed upload URL authorized by Express API.`);
-      setUploadedFiles(p => [...p, { name: fileName, type: docType, size: '4.2 MB', s3Key: key }]);
+      if (!uploadUrl || !key) throw new Error('The API did not return a signed upload URL.');
+      const uploadResponse = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': contentType },
+        body: file,
+      });
+      if (!uploadResponse.ok) throw new Error(`Storage upload failed (${uploadResponse.status}). Check Supabase Storage S3/CORS settings.`);
+      const completed = await apiFetch<any>(`/v1/rfq/${rfqId}/documents/complete`, {
+        method: 'POST',
+        body: JSON.stringify({ key, fileName: file.name, contentType, sizeBytes: file.size }),
+      });
+      if (!completed.data?.id) throw new Error('The file uploaded, but the API could not confirm the document record. Please retry or contact support.');
+      setStorageLog(`Uploaded and verified ${file.name} in Supabase Storage\nObject key: ${key}\nDocument record: ${completed.data.id}`);
+      setUploadedFiles(p => [...p, { name: file.name, type: docType, size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`, s3Key: key }]);
     } catch (err) {
       console.error('[RFQNewPage] upload failed', err);
-      setFormError(`Failed to prepare ${docType} upload. Please try again.`);
+      setFormError(err instanceof Error ? err.message : `Failed to upload ${docType}. Please try again.`);
     } finally { setUploading(null); }
   };
 
@@ -110,7 +154,7 @@ export default function RFQNewPage() {
       setDone(true);
     } catch (err) {
       console.error('[RFQNewPage] submission failed', err);
-      setFormError('Failed to submit RFQ. Please try again.');
+      setFormError(err instanceof Error ? err.message : 'Failed to submit RFQ. Please try again.');
     } finally { setSubmitting(false); }
   };
 
@@ -128,21 +172,13 @@ export default function RFQNewPage() {
         <div style={{ width: 56, height: 56, background: C.green, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 18px', color: '#fff' }}>
           <span className="material-symbols-outlined" style={{ fontSize: 28 }}>check</span>
         </div>
-        <div style={{ fontSize: 9, fontFamily: "'JetBrains Mono', monospace", color: C.green, letterSpacing: '0.12em', marginBottom: 10 }}>SUBMITTED — WRITTEN TO POSTGRESQL</div>
+        <div style={{ fontSize: 9, fontFamily: "'JetBrains Mono', monospace", color: C.green, letterSpacing: '0.12em', marginBottom: 10 }}>SUBMITTED — CONFIRMED BY API</div>
         <h2 style={{ fontSize: mob ? 20 : 24, fontFamily: "'Hanken Grotesk', sans-serif", fontWeight: 700, color: C.textDark, marginBottom: 8 }}>RFQ Submitted Successfully</h2>
         <div style={{ fontSize: 15, fontFamily: "'JetBrains Mono', monospace", color: C.textFaint, marginBottom: 20 }}>Reference: {refId}</div>
-        <div style={{ textAlign: 'left', background: C.textDark, padding: 14, maxWidth: 420, margin: '0 auto 24px' }}>
-          <div style={{ fontSize: 8, color: `${C.blue}88`, marginBottom: 6, letterSpacing: '0.1em', fontFamily: "'JetBrains Mono', monospace" }}>POSTGRESQL WRITE CONFIRMATION</div>
-          <pre style={{ fontSize: 9, fontFamily: "'JetBrains Mono', monospace", color: C.blue, margin: 0, lineHeight: '16px' }}>{`INSERT INTO rfq_submissions (
-  vendor_id, part_number, status
-) VALUES (
-  '${user.vendorId}',
-  '${form.partNumber || 'PT-7A-CRANK-001'}',
-  'PENDING'
-) RETURNING id;
--- 1 row inserted [OK]`}</pre>
+        <div style={{ textAlign: 'left', background: C.surfaceLow, border: `1px solid ${C.borderLight}`, padding: 16, maxWidth: 420, margin: '0 auto 24px', color: C.textMuted, fontSize: 13, lineHeight: '20px' }}>
+          The API confirmed that your RFQ was saved. Your reference number is shown above. Keep it for support and status enquiries.
         </div>
-        <SecondaryButton icon="arrow_back" onClick={() => { setDone(false); setStep(1); setUploadedFiles([]); setForm({ partNumber:'',partName:'',annualVolume:'',targetPrice:'',material:'Select...',toleranceClass:'Select...',drawingRef:'',requiredBy:'',notes:'' }); }}>
+        <SecondaryButton icon="arrow_back" onClick={() => { setDone(false); setStep(1); setDraftId(null); setRefId(''); setStorageLog(''); setFormError(''); setUploadedFiles([]); setForm({ partNumber:'',partName:'',annualVolume:'',targetPrice:'',material:'Select...',toleranceClass:'Select...',drawingRef:'',requiredBy:'',notes:'' }); }}>
           Submit Another RFQ
         </SecondaryButton>
       </div>
@@ -220,13 +256,26 @@ export default function RFQNewPage() {
           </div>
         )}
 
+        {/* File bytes are sent to Supabase Storage with a short-lived URL from the API. */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".pdf,.dxf,.step,.stp,.iges,.igs,.xlsx,.xls,.csv,.png,.jpg,.jpeg,.webp"
+          style={{ display: 'none' }}
+          onChange={(event) => {
+            const file = event.currentTarget.files?.[0];
+            event.currentTarget.value = '';
+            if (file && pendingDocType) void handleUpload(pendingDocType, file);
+          }}
+        />
+
         {/* Step 2 — Upload */}
         {step===2 && (
           <div style={{ display:'grid', gridTemplateColumns:mob?'1fr':'1fr 1fr', gap:22 }}>
             <div>
               <div style={{ marginBottom:16 }}>
                 <div style={{ fontSize:14, fontWeight:600, color:C.textDark, fontFamily:"'Hanken Grotesk',sans-serif", marginBottom:4 }}>Documentation Upload</div>
-                <div style={{ fontSize:13, color:C.textMuted }}>Each file triggers a pre-signed Cloudflare R2 URL via the Express API.</div>
+                <div style={{ fontSize:13, color:C.textMuted }}>Each file uses a short-lived Supabase Storage signed URL issued by the Express API.</div>
               </div>
               {DOC_TYPES.map(t => (
                 <div key={t} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 13px', border:`1px solid ${C.borderLight}`, background:C.surfaceCard, marginBottom:8, gap:10 }}>
@@ -234,19 +283,19 @@ export default function RFQNewPage() {
                     <span className="material-symbols-outlined" style={{ fontSize:16, color:C.textFaint, flexShrink:0 }}>description</span>
                     <div style={{ minWidth:0 }}>
                       <div style={{ fontSize:12, fontWeight:500, color:C.textDark, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{t}</div>
-                      <div style={{ fontSize:10, color:C.textFaint }}>PDF, STEP, IGES — max 25MB</div>
+                      <div style={{ fontSize:10, color:C.textFaint }}>PDF, DXF, STEP, IGES, XLSX — max 25 MB</div>
                     </div>
                   </div>
-                  <button onClick={() => handleUpload(t)} disabled={!!uploading}
+                  <button onClick={() => { setPendingDocType(t); fileInputRef.current?.click(); }} disabled={!!uploading}
                     style={{ display:'flex', alignItems:'center', gap:5, padding:'5px 11px', background:C.textDark, color:'#fff', border:'none', fontSize:11, fontFamily:"'Hanken Grotesk',sans-serif", fontWeight:600, cursor:uploading?'wait':'pointer', borderRadius:0, flexShrink:0 }}>
                     {uploading===t ? <><Spinner size={9} /> Uploading</> : <><span className="material-symbols-outlined" style={{ fontSize:12 }}>upload</span> Upload</>}
                   </button>
                 </div>
               ))}
-              {s3Log && (
+              {storageLog && (
                 <div style={{ background:C.textDark, padding:12, marginTop:10 }}>
-                  <div style={{ fontSize:8, fontFamily:"'JetBrains Mono',monospace", color:`${C.blue}88`, marginBottom:5, letterSpacing:'0.1em' }}>PRE-SIGNED R2 URL GENERATED</div>
-                  <pre style={{ fontSize:8, fontFamily:"'JetBrains Mono',monospace", color:C.blue, margin:0, lineHeight:'14px', whiteSpace:'pre-wrap' }}>{s3Log}</pre>
+                  <div style={{ fontSize:8, fontFamily:"'JetBrains Mono',monospace", color:`${C.blue}88`, marginBottom:5, letterSpacing:'0.1em' }}>SUPABASE STORAGE UPLOAD LOG</div>
+                  <pre style={{ fontSize:8, fontFamily:"'JetBrains Mono',monospace", color:C.blue, margin:0, lineHeight:'14px', whiteSpace:'pre-wrap' }}>{storageLog}</pre>
                 </div>
               )}
             </div>
@@ -283,7 +332,7 @@ export default function RFQNewPage() {
             <div style={{ display:'flex', flexDirection:'column', gap:13 }}>
               <div style={{ background:C.textDark, padding:16 }}>
                 <div style={{ fontSize:8, fontFamily:"'JetBrains Mono',monospace", color:`${C.blue}77`, letterSpacing:'0.1em', textTransform:'uppercase', marginBottom:10 }}>SUBMISSION SUMMARY</div>
-                {([['Submitter',user.name],['Company',user.company],['Vendor ID',user.vendorId],['Documents',`${uploadedFiles.length} attached`],['Target Table','rfq_submissions'],['Status','READY']] as [string,string][]).map(([k,v]) => (
+                {([['Submitter',user.name],['Company',user.company],['Vendor ID',user.vendorId],['Documents',`${uploadedFiles.length} attached`],['Target Table','RFQ'],['Status','READY']] as [string,string][]).map(([k,v]) => (
                   <div key={k} style={{ display:'flex', justifyContent:'space-between', marginBottom:7, paddingBottom:7, borderBottom:`1px solid ${C.borderDark}`, gap:8 }}>
                     <span style={{ fontSize:9, fontFamily:"'JetBrains Mono',monospace", color:`${C.textLight}44`, flexShrink:0 }}>{k}</span>
                     <span style={{ fontSize:9, fontFamily:"'JetBrains Mono',monospace", color:C.blue, textAlign:'right' }}>{v}</span>
@@ -303,7 +352,7 @@ export default function RFQNewPage() {
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:mob?22:32, paddingTop:mob?16:20, borderTop:`1px solid ${C.borderLight}` }}>
           <SecondaryButton onClick={() => setStep(s => Math.max(1,s-1))} disabled={step===1} icon="arrow_back">Prev</SecondaryButton>
           {step<3
-            ? <PrimaryButton onClick={() => setStep(s => s+1)} icon="arrow_forward">{mob?`Step ${step+1}`:`Continue to Step ${step+1}`}</PrimaryButton>
+            ? <PrimaryButton onClick={() => { if (step === 1 && !validateRequiredFields()) return; setFormError(''); setStep(s => s+1); }} icon="arrow_forward">{mob?`Step ${step+1}`:`Continue to Step ${step+1}`}</PrimaryButton>
             : <PrimaryButton onClick={handleSubmit} disabled={submitting} icon={submitting?undefined:'send'}>{submitting?<><Spinner size={13}/>Submitting...</>:'Submit RFQ'}</PrimaryButton>
           }
         </div>

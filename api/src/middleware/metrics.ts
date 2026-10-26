@@ -25,11 +25,8 @@ export function metricsMiddleware(req: Request, res: Response, next: NextFunctio
 
 /**
  * Prometheus scrape endpoint.
- * Mount BEFORE auth middleware so Prometheus can reach it without a JWT:
- *   app.get('/metrics', metricsEndpoint)
- *
- * Block this path at Cloudflare / your reverse proxy so it is never
- * reachable from the public internet — only from inside your VPC/network.
+ * app.ts wraps this handler with a bearer-token check (and hides it in production
+ * unless METRICS_BEARER_TOKEN is configured). Do not expose this endpoint publicly.
  */
 export async function metricsEndpoint(_req: Request, res: Response): Promise<void> {
   try {

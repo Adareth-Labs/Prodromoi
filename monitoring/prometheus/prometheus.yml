@@ -1,35 +1,35 @@
 global:
-  scrape_interval:     15s
+  scrape_interval: 15s
   evaluation_interval: 15s
   external_labels:
     env: production
 
 alerting:
-  alertmanagers: []   # add Alertmanager here when ready
+  alertmanagers: []
 
-rule_files: []        # add alert rule files here
+rule_files: []
 
 scrape_configs:
-
-  # ── PrecisionCore API ───────────────────────────────────────────────────────
-  # The API exposes /metrics via the metricsEndpoint middleware.
-  # If running outside Docker: set targets to host.docker.internal:3001
   - job_name: precisioncore-api
     static_configs:
-      - targets: ['host.docker.internal:3001']
+      - targets: ['host.docker.internal:3002']
         labels:
           app: api
     metrics_path: /metrics
     scrape_interval: 10s
+    # For production, set METRICS_BEARER_TOKEN in the API environment, place
+    # the same token in monitoring/prometheus/secrets/metrics-token (no newline),
+    # then uncomment this block. Keep the secret file out of Git.
+    # authorization:
+    #   type: Bearer
+    #   credentials_file: /etc/prometheus/secrets/metrics-token
 
-  # ── Node exporter (host system metrics) ────────────────────────────────────
   - job_name: node
     static_configs:
       - targets: ['node-exporter:9100']
         labels:
           host: precisioncore-server
 
-  # ── Prometheus self-monitoring ──────────────────────────────────────────────
   - job_name: prometheus
     static_configs:
       - targets: ['localhost:9090']

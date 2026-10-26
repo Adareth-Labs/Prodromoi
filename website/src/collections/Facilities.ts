@@ -1,5 +1,6 @@
 import type { CollectionConfig } from 'payload'
 
+import { triggerContentRevalidation } from '../lib/revalidate-content'
 export const Facilities: CollectionConfig = {
   slug: 'facilities',
   labels: { singular: 'Facility', plural: 'Facilities' },
@@ -123,4 +124,12 @@ export const Facilities: CollectionConfig = {
       ],
     },
   ],
+  hooks: {
+    afterChange: [
+      async ({ doc }) => {
+        await triggerContentRevalidation('facility', (doc as { slug?: string }).slug)
+        return doc
+      },
+    ],
+  },
 }

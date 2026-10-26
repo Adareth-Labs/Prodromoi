@@ -1,5 +1,6 @@
 import type { GlobalConfig } from 'payload'
 
+import { triggerContentRevalidation } from '../lib/revalidate-content'
 // The siteMetrics model content type had no Payload equivalent at all.
 // Modeled as a Global (one singleton document) rather than a Collection,
 // since this is exactly the aggregate data the homepage currently hardcodes
@@ -50,15 +51,9 @@ export const SiteMetrics: GlobalConfig = {
   hooks: {
     afterChange: [
       async ({ doc }) => {
-        // Mirrors the existing collection revalidation hooks (see Solutions.ts)
-        if (process.env.NEXT_PUBLIC_SITE_URL && process.env.REVALIDATION_SECRET) {
-          await fetch(
-            `${process.env.NEXT_PUBLIC_SITE_URL}/api/revalidate?secret=${process.env.REVALIDATION_SECRET}&tag=site-metrics`,
-            { method: 'POST' }
-          ).catch((err) => console.error('[SiteMetrics] revalidation failed', err))
-        }
+        await triggerContentRevalidation('siteMetrics')
         return doc
-      },
+      }
     ],
   },
 }

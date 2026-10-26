@@ -1,6 +1,6 @@
 # PrecisionCore Automotive — Partner Portal
 
-Next.js 15 App Router application for authenticated supplier collaboration across PrecisionCore Automotive’s partner network. Supabase Auth handles sessions; the central Express API owns supplier/business data; Cloudflare R2 owns document storage.
+Next.js 15 App Router application for authenticated supplier collaboration across PrecisionCore Automotive’s partner network. Supabase Auth handles sessions; the central Express API owns supplier/business data; Supabase Storage owns document storage.
 
 ## Architecture
 
@@ -9,7 +9,7 @@ partners.precisioncore.example
 ├── Supabase Auth                 ← password, magic-link and OAuth sessions
 ├── Express API                   ← authentication context, RBAC, supplier/business data
 ├── PostgreSQL + Prisma           ← owned and accessed by the API only
-├── Cloudflare R2                 ← RFQ and PPAP documents via API-issued pre-signed URLs
+├── Supabase Storage              ← RFQ and PPAP documents via API-issued short-lived signed URLs
 └── Next.js middleware            ← session validation only
 ```
 
@@ -73,4 +73,7 @@ portal/
 
 ## Document uploads
 
-Files are uploaded directly from the browser to Cloudflare R2 using pre-signed URLs issued by the Express API. PostgreSQL stores the metadata and ownership relationship behind the API.
+Files are uploaded to Supabase Storage using short-lived signed URLs issued by the Express API. PostgreSQL stores the metadata and ownership relationship behind the API.
+
+
+<!-- Legacy Cloudflare R2 references are retained in commented implementation blocks in the source for rollback. -->

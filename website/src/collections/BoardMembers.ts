@@ -1,5 +1,6 @@
 import type { CollectionConfig } from 'payload'
 
+import { triggerContentRevalidation } from '../lib/revalidate-content'
 // Board-member records are managed directly in Payload CMS.
 export const BoardMembers: CollectionConfig = {
   slug: 'board-members',
@@ -44,4 +45,12 @@ export const BoardMembers: CollectionConfig = {
       admin: { position: 'sidebar', description: 'Lower numbers appear first' },
     },
   ],
+  hooks: {
+    afterChange: [
+      async ({ doc }) => {
+        await triggerContentRevalidation('boardMember', (doc as { slug?: string }).slug)
+        return doc
+      },
+    ],
+  },
 }

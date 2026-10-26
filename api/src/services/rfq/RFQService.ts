@@ -10,7 +10,7 @@ import { notFound, HttpError } from '@/utils/httpError'
 
 function generateTrackingId(): string {
   const year  = new Date().getFullYear()
-  const token = randomBytes(3).toString('hex').toUpperCase()
+  const token = randomBytes(8).toString('hex').toUpperCase()
   return `RFQ-${year}-${token}`
 }
 

@@ -1,4 +1,4 @@
-import { getInvestorDocuments } from '@/lib/r2/client'
+import { getInvestorDocuments } from '@/lib/supabase-storage/investor-documents'
 import { format } from 'date-fns'
 import type { Metadata } from 'next'
 
@@ -15,10 +15,13 @@ export default async function InvestorsPage() {
 
   return (
     <div className="max-w-platform mx-auto px-12 py-12">
-      <div className="border-b border-stroke pb-6 mb-10">
-        <span className="section-label">NYSE: PCR · Public Company · Data current as of Q3 2024</span>
+      <div className="border-b border-stroke pb-6 mb-6">
+        <span className="section-label">Investor Relations · Demonstration Page</span>
         <h1 className="text-3xl font-medium tracking-tight">Investor Relations &amp; ESG Hub</h1>
-        <p className="text-base text-ink-secondary mt-2">Official repository for quarterly earnings, SEC filings, governance frameworks, and Scope 1–3 environmental disclosures.</p>
+        <p className="text-base text-ink-secondary mt-2">Illustrative layout for a future repository of financial filings, governance materials, and environmental disclosures.</p>
+      </div>
+      <div role="note" className="mb-10 border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+        Demonstration content only. Company identifiers, share price, market value, ratings, ESG metrics, dates, and filing examples are not verified disclosures. Replace them with approved, current source data before publishing this page as investor information.
       </div>
 
       {/* KPI row */}
@@ -47,12 +50,9 @@ export default async function InvestorsPage() {
             <div className="grid grid-cols-[120px_80px_1fr_80px] gap-4 px-4 py-3 bg-surface-low border-b border-stroke">
               {['Date','Form','Description','Files'].map(h=><span key={h} className="section-label" style={{margin:0}}>{h}</span>)}
             </div>
-            {(documents.length ? documents : [
-              { key:'10-K/2024/annual.pdf', title:'Annual Report pursuant to Section 13 and 15(d)', filingType:'10-K' as const, filedAt:'2024-02-15', presignedUrl:'#', expiresAt:'', fileSizeBytes:0 },
-              { key:'10-Q/2023/q3.pdf',     title:'Quarterly Report pursuant to Section 13 or 15(d)', filingType:'10-Q' as const, filedAt:'2023-11-08', presignedUrl:'#', expiresAt:'', fileSizeBytes:0 },
-              { key:'8-K/2023/q3-earnings.pdf', title:'Current report — Q3 2023 Earnings Release', filingType:'8-K' as const, filedAt:'2023-10-15', presignedUrl:'#', expiresAt:'', fileSizeBytes:0 },
-              { key:'DEF14A/2023/proxy.pdf', title:'Proxy Statement — Notice of Annual Meeting', filingType:'DEF 14A' as const, filedAt:'2023-09-01', presignedUrl:'#', expiresAt:'', fileSizeBytes:0 },
-            ]).map((doc) => (
+            {documents.length === 0 ? (
+              <div className="px-5 py-8 text-sm text-ink-secondary">No investor filings are currently published. Approved documents will appear here when available.</div>
+            ) : documents.map((doc) => (
               <div key={doc.key} className="grid grid-cols-[120px_80px_1fr_80px] gap-4 px-4 py-3.5 border-b border-stroke last:border-0 items-center">
                 <time className="font-mono text-xs text-ink-secondary" dateTime={doc.filedAt}>{format(new Date(doc.filedAt),'yyyy-MM-dd')}</time>
                 <span className="font-mono text-xs border border-stroke px-2 py-0.5 text-ink-secondary">{doc.filingType}</span>
@@ -106,7 +106,7 @@ export default async function InvestorsPage() {
           <div className="card p-5">
             <h3 className="text-sm font-medium mb-2">Automotive Climate Action Questionnaire</h3>
             <p className="text-sm text-ink-secondary mb-3">Aligned with the ACAQ framework developed by Ford, GM, Honda, Denso, and Toyota for consistent Scope 3 reporting.</p>
-            <a href="#" className="inline-flex items-center gap-1 text-xs font-mono border border-ink-primary text-ink-primary px-3 py-1.5 hover:bg-surface-mid transition-colors">Download Response 2023</a>
+            <span className="inline-flex items-center gap-1 text-xs font-mono border border-stroke text-ink-secondary px-3 py-1.5">Example link not configured</span>
           </div>
         </aside>
       </div>

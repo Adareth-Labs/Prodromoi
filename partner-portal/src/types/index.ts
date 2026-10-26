@@ -66,6 +66,7 @@ export type PPAPStatus = 'DRAFT' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED';
 
 export interface PPAPDocument {
   id: string;
+  ppapId?: string;
   vendorId: string;
   name: string;
   fileType: string;
@@ -121,8 +122,10 @@ export interface CAR {
   correctiveActions?: string;
   preventiveActions?: string;
   closureNotes?: string;
+  reviewerNotes?: string;
   severity: CARSeverity;
   status: CARStatus;
+  workflowStatus?: 'OPEN' | 'ROOT_CAUSE_IDENTIFIED' | 'ACTION_PLAN_SUBMITTED' | 'VERIFICATION_PENDING' | 'CLOSED' | 'ESCALATED';
   currentStep: number;
   openedAt: string;
   closedAt?: string;
@@ -161,9 +164,9 @@ export interface ProductionLine {
 export interface CapacityDashboard {
   vendorId: string;
   snapshotAt: string;
-  overallOEE: number;
-  partsShippedMTD: number;
-  monthlyTarget: number;
+  overallOEE: number | null;
+  partsShippedMTD: number | null;
+  monthlyTarget: number | null;
   lines: ProductionLine[];
   weeklyHistory: { day: string; oee: number; utilization: number }[];
 }
